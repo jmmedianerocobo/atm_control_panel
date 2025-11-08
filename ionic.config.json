@@ -1,0 +1,7 @@
+{
+  "name": "atm-control-panel",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
