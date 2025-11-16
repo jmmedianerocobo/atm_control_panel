@@ -1,0 +1,98 @@
+ion-card {
+  margin: 16px;
+  
+  ion-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+  }
+}
+
+ion-list {
+  background: transparent;
+  
+  ion-item {
+    --background: transparent;
+    --padding-start: 0;
+    
+    &[button] {
+      cursor: pointer;
+      
+      &:hover {
+        --background: rgba(var(--ion-color-primary-rgb), 0.1);
+      }
+    }
+  }
+}
+
+ion-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+
+ion-note {
+  font-size: 12px;
+}
+
+// Estilo para los logs
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ion-color-light);
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  ion-icon {
+    margin-right: 8px;
+    font-size: 20px;
+    margin-top: 6px;
+  }
+  
+  .log-content {
+    flex: 1;
+    
+    .log-time {
+      font-size: 11px;
+      color: var(--ion-color-medium);
+      margin-bottom: 2px;
+    }
+    
+    .log-message {
+      font-size: 13px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+  }
+}
+
+// Animación para nuevos logs
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+ion-item {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Banner de reconexión */
+.reconnecting-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(var(--ion-color-warning-rgb), 0.06);
+  padding: 8px;
+  border-radius: 8px;
+  margin-top: 12px;
+}

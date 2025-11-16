@@ -1,0 +1,413 @@
+// bt-settings.page.scss
+
+// ==========================================
+// CONTENEDOR DEL LOG
+// ==========================================
+.log-container {
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  border: 1px solid var(--ion-color-medium);
+  margin-bottom: 12px;
+
+  // Scrollbar personalizado
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #2a2a2a;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--ion-color-primary);
+    border-radius: 4px;
+
+    &:hover {
+      background: var(--ion-color-primary-shade);
+    }
+  }
+}
+
+// ==========================================
+// ENTRADAS DEL LOG
+// ==========================================
+.log-entry {
+  --background: transparent;
+  --padding-start: 0;
+  --padding-end: 0;
+  --inner-padding-end: 0;
+  --min-height: auto;
+  margin-bottom: 4px;
+
+  ion-label {
+    margin: 0;
+    padding: 4px 0;
+
+    code {
+      display: block;
+      color: #d4d4d4;
+      font-size: 12px;
+      line-height: 1.4;
+      word-break: break-all;
+      white-space: pre-wrap;
+
+      // Colores para diferentes tipos de mensajes
+      &:contains("📥 RX:") {
+        color: #4ec9b0; // Verde azulado para recibidos
+      }
+
+      &:contains("📤 TX:") {
+        color: #ce9178; // Naranja para enviados
+      }
+
+      &:contains("✅") {
+        color: #4ec9b0; // Verde para éxito
+      }
+
+      &:contains("❌") {
+        color: #f48771; // Rojo para errores
+      }
+
+      &:contains("⚠️") {
+        color: #dcdcaa; // Amarillo para advertencias
+      }
+
+      &:contains("ℹ️") {
+        color: #569cd6; // Azul para información
+      }
+
+      &:contains("🔍") {
+        color: #c586c0; // Morado para búsqueda
+      }
+
+      &:contains("🔗") {
+        color: #9cdcfe; // Azul claro para conexión
+      }
+    }
+  }
+}
+
+// ==========================================
+// LOG VACÍO
+// ==========================================
+.empty-log {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--ion-color-medium);
+
+  ion-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 8px 0;
+    font-size: 14px;
+
+    small {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+  }
+}
+
+// ==========================================
+// TARJETAS
+// ==========================================
+ion-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  
+  &[color="success"] {
+    ion-card-title,
+    ion-card-subtitle,
+    ion-item {
+      --color: var(--ion-color-success-contrast);
+    }
+  }
+
+  &[color="medium"] {
+    ion-card-title,
+    ion-card-subtitle,
+    ion-item {
+      --color: var(--ion-color-medium-contrast);
+    }
+  }
+}
+
+// ==========================================
+// BARRA DE ESTADO DE CONEXIÓN
+// ==========================================
+ion-toolbar[color] {
+  ion-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    ion-icon {
+      margin-right: 8px;
+      font-size: 20px;
+    }
+
+    .ion-animate-spin {
+      animation: spin 2s linear infinite;
+    }
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+// ==========================================
+// LISTAS
+// ==========================================
+ion-list {
+  &[inset="true"] {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+}
+
+ion-list-header {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  padding-top: 16px;
+}
+
+// ==========================================
+// ITEMS
+// ==========================================
+ion-item {
+  &[button] {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      --background-hover: var(--ion-color-light);
+    }
+
+    &:active {
+      --background-activated: var(--ion-color-light-shade);
+    }
+  }
+
+  &[color="success"] {
+    --background: var(--ion-color-success);
+    --color: var(--ion-color-success-contrast);
+
+    ion-label,
+    ion-note,
+    ion-icon {
+      color: var(--ion-color-success-contrast);
+    }
+  }
+}
+
+// ==========================================
+// BADGES
+// ==========================================
+ion-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+// ==========================================
+// BOTONES
+// ==========================================
+ion-button {
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+
+  &[expand="full"] {
+    margin: 8px 0;
+  }
+
+  ion-icon {
+    font-size: 20px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+// ==========================================
+// SPINNERS
+// ==========================================
+ion-spinner {
+  margin: 0 8px;
+}
+
+.ion-text-center {
+  ion-spinner {
+    margin: 0 auto;
+    display: block;
+  }
+}
+
+// ==========================================
+// GRID Y LAYOUT
+// ==========================================
+ion-grid {
+  hr {
+    border: none;
+    border-top: 1px solid var(--ion-color-light);
+    margin: 16px 0;
+  }
+}
+
+// ==========================================
+// CARDS DE INFORMACIÓN
+// ==========================================
+ion-card[color="light"] {
+  border: 1px solid var(--ion-color-medium);
+  
+  ion-card-content {
+    padding: 20px;
+  }
+}
+
+// ==========================================
+// NOTAS E INFORMACIÓN
+// ==========================================
+ion-note {
+  font-size: 12px;
+  
+  p {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+  }
+
+  ion-icon {
+    font-size: 16px;
+  }
+}
+
+// ==========================================
+// INPUT PERSONALIZADO
+// ==========================================
+ion-item {
+  ion-input {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+  }
+}
+
+// ==========================================
+// RESPONSIVE
+// ==========================================
+@media (max-width: 576px) {
+  .log-container {
+    max-height: 200px;
+    font-size: 11px;
+  }
+
+  ion-card-title {
+    font-size: 18px;
+  }
+
+  ion-card-subtitle {
+    font-size: 13px;
+  }
+
+  ion-button {
+    font-size: 13px;
+
+    ion-icon {
+      font-size: 18px;
+    }
+  }
+}
+
+// ==========================================
+// DARK MODE SUPPORT
+// ==========================================
+@media (prefers-color-scheme: dark) {
+  .log-container {
+    background-color: #0d0d0d;
+    border-color: var(--ion-color-dark);
+  }
+
+  ion-card {
+    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.05);
+  }
+}
+
+// ==========================================
+// ANIMACIONES
+// ==========================================
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+ion-card,
+ion-list {
+  animation: fadeIn 0.3s ease-out;
+}
+
+// ==========================================
+// UTILIDADES
+// ==========================================
+.ion-text-wrap {
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+.ion-no-padding {
+  padding: 0 !important;
+}
+
+.ion-margin-top {
+  margin-top: 16px !important;
+}
+
+// ==========================================
+// SCROLLBAR GLOBAL
+// ==========================================
+ion-content {
+  --keyboard-offset: 0px;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--ion-color-medium);
+    border-radius: 4px;
+
+    &:hover {
+      background: var(--ion-color-medium-shade);
+    }
+  }
+}

@@ -1,0 +1,413 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+    <ion-title>⚙️ Bluetooth Settings</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="refresh()">
+        <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+
+  <!-- Barra de estado de conexión -->
+  <ion-toolbar [color]="connectionStatusColor">
+    <ion-title size="small">
+      <ion-icon [name]="isConnected ? 'checkmark-circle' : (isConnecting ? 'sync-outline' : 'close-circle')" 
+                [class.ion-animate-spin]="isConnecting"></ion-icon>
+      {{ connectionStatusText }}
+    </ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <!-- Refresher -->
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-grid class="ion-padding">
+
+    <!-- ========================================= -->
+    <!-- TARJETA DE ESTADO DE CONEXIÓN -->
+    <!-- ========================================= -->
+    <ion-row>
+      <ion-col size="12">
+        <ion-card [color]="isConnected ? 'success' : 'medium'">
+          <ion-card-header>
+            <ion-card-subtitle>Estado de Conexión</ion-card-subtitle>
+            <ion-card-title>
+              <ion-icon name="bluetooth-outline" size="large"></ion-icon>
+              {{ isConnected ? 'Conectado' : 'Desconectado' }}
+            </ion-card-title>
+          </ion-card-header>
+          
+          <ion-card-content>
+            <!-- Información del dispositivo conectado -->
+            <ion-list *ngIf="connectedDevice" lines="none" [class.ion-no-padding]="true">
+              <ion-item [color]="isConnected ? 'success' : 'medium'">
+                <ion-label>
+                  <h2>{{ connectedDevice.name }}</h2>
+                  <p>{{ connectedDevice.address }}</p>
+                </ion-label>
+                <ion-badge slot="end" color="light">ACTIVO</ion-badge>
+              </ion-item>
+
+              <!-- Estadísticas de conexión -->
+              <ion-item [color]="isConnected ? 'success' : 'medium'" *ngIf="stats.uptime > 0">
+                <ion-label>
+                  <p><strong>Uptime:</strong> {{ formattedUptime }}</p>
+                  <p><strong>Datos recibidos:</strong> {{ stats.dataReceivedCount }} mensajes</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+
+            <!-- Mensaje cuando no hay conexión -->
+            <ion-text *ngIf="!connectedDevice" color="light">
+              <p class="ion-text-center">No hay ningún dispositivo conectado.</p>
+            </ion-text>
+
+            <!-- Botón de desconexión -->
+            <ion-button 
+              *ngIf="isConnected" 
+              expand="full" 
+              color="light" 
+              (click)="disconnect()"
+              [disabled]="isConnecting">
+              <ion-icon slot="start" name="unlink-outline"></ion-icon>
+              Desconectar
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <!-- ========================================= -->
+    <!-- TARJETA DE LOG DE DATOS -->
+    <!-- ========================================= -->
+    <ion-row>
+      <ion-col size="12">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>
+              <ion-icon name="terminal-outline"></ion-icon>
+              Monitor de Datos
+            </ion-card-title>
+            <ion-card-subtitle>
+              Log de transmisión Bluetooth ({{ receivedDataLog.length }}/{{ maxLogLines }})
+            </ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content>
+            <!-- Área de log con scroll -->
+            <div class="log-container">
+              <ion-list *ngIf="receivedDataLog.length > 0; else emptyLog" lines="none">
+                <ion-item *ngFor="let logEntry of receivedDataLog" class="log-entry">
+                  <ion-label class="ion-text-wrap">
+                    <code>{{ logEntry }}</code>
+                  </ion-label>
+                </ion-item>
+              </ion-list>
+
+              <ng-template #emptyLog>
+                <div class="empty-log">
+                  <ion-icon name="document-text-outline" size="large" color="medium"></ion-icon>
+                  <p>No hay datos en el log.</p>
+                  <p><small>Los datos enviados y recibidos aparecerán aquí.</small></p>
+                </div>
+              </ng-template>
+            </div>
+
+            <!-- Botones de acción del log -->
+            <ion-grid class="ion-no-padding ion-margin-top">
+              <ion-row>
+                <ion-col size="6">
+                  <ion-button 
+                    expand="full" 
+                    fill="outline" 
+                    (click)="clearLog()"
+                    [disabled]="receivedDataLog.length === 0">
+                    <ion-icon name="trash-outline" slot="start"></ion-icon>
+                    Limpiar
+                  </ion-button>
+                </ion-col>
+                <ion-col size="6">
+                  <ion-button 
+                    expand="full" 
+                    fill="outline" 
+                    (click)="copyLogToClipboard()"
+                    [disabled]="receivedDataLog.length === 0">
+                    <ion-icon name="copy-outline" slot="start"></ion-icon>
+                    Copiar
+                  </ion-button>
+                </ion-col>
+              </ion-row>
+            </ion-grid>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <!-- ========================================= -->
+    <!-- TARJETA DE DISPOSITIVOS -->
+    <!-- ========================================= -->
+    <ion-row>
+      <ion-col size="12">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>
+              <ion-icon name="list-outline"></ion-icon>
+              Dispositivos Disponibles
+            </ion-card-title>
+            <ion-card-subtitle>
+              Selecciona un dispositivo para conectar
+            </ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content>
+            <!-- Dispositivos emparejados filtrados (HC-05/HC-06) -->
+            <ion-list-header *ngIf="filteredPairedDevices.length > 0">
+              <ion-label>Módulos HC Emparejados</ion-label>
+            </ion-list-header>
+
+            <ion-list [inset]="true" *ngIf="filteredPairedDevices.length > 0">
+              <ion-item 
+                *ngFor="let device of filteredPairedDevices" 
+                [button]="device.address !== connectedDevice?.address"
+                (click)="pairAndConnect(device)" 
+                [detail]="device.address !== connectedDevice?.address"
+                [color]="device.address === connectedDevice?.address ? 'success' : ''">
+                <ion-icon 
+                  [name]="device.address === connectedDevice?.address ? 'checkmark-circle' : 'bluetooth-outline'" 
+                  slot="start"
+                  [color]="device.address === connectedDevice?.address ? 'light' : 'primary'">
+                </ion-icon>
+                <ion-label>
+                  <h2>{{ device.name || 'Desconocido' }}</h2>
+                  <p>{{ device.address }}</p>
+                </ion-label>
+                <ion-badge 
+                  slot="end" 
+                  [color]="device.address === connectedDevice?.address ? 'light' : 'primary'">
+                  {{ device.address === connectedDevice?.address ? 'CONECTADO' : 'TOCAR PARA CONECTAR' }}
+                </ion-badge>
+              </ion-item>
+            </ion-list>
+
+            <!-- Mensaje cuando no hay dispositivos emparejados -->
+            <ion-card *ngIf="filteredPairedDevices.length === 0 && !isScanning" color="light">
+              <ion-card-content class="ion-text-center">
+                <ion-icon name="bluetooth-outline" size="large" color="medium"></ion-icon>
+                <p>No hay dispositivos HC-05/HC-06 emparejados.</p>
+                <p><small>Escanea para buscar dispositivos cercanos.</small></p>
+              </ion-card-content>
+            </ion-card>
+
+            <!-- Botón de escaneo -->
+            <ion-button 
+              expand="full" 
+              [color]="isScanning ? 'warning' : 'primary'" 
+              (click)="scanForUnpaired()" 
+              [disabled]="isScanning || isConnecting">
+              <ion-icon 
+                [name]="isScanning ? 'sync-outline' : 'search-outline'" 
+                [class.ion-animate-spin]="isScanning" 
+                slot="start">
+              </ion-icon>
+              {{ isScanning ? 'Escaneando...' : 'Escanear Dispositivos' }}
+            </ion-button>
+
+            <!-- Dispositivos no emparejados encontrados -->
+            <ion-list 
+              *ngIf="unpairedDevices.length > 0" 
+              [inset]="true" 
+              class="ion-margin-top">
+              <ion-list-header>
+                <ion-label color="medium">Dispositivos Cercanos ({{ unpairedDevices.length }})</ion-label>
+              </ion-list-header>
+
+              <ion-item 
+                *ngFor="let device of unpairedDevices | slice:0:5" 
+                lines="full">
+                <ion-icon name="bluetooth-outline" slot="start" color="medium"></ion-icon>
+                <ion-label>
+                  <h3>{{ device.name || 'Desconocido' }}</h3>
+                  <p>{{ device.address }}</p>
+                </ion-label>
+                <ion-button 
+                  slot="end" 
+                  size="small" 
+                  (click)="pairAndConnect(device)" 
+                  [disabled]="isConnecting">
+                  <ion-icon name="link-outline" slot="start"></ion-icon>
+                  Emparejar
+                </ion-button>
+              </ion-item>
+
+              <ion-item *ngIf="unpairedDevices.length > 5" lines="none">
+                <ion-label color="medium" class="ion-text-center">
+                  <small>... y {{ unpairedDevices.length - 5 }} dispositivos más</small>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+
+            <!-- Indicador de escaneo activo -->
+            <ion-item *ngIf="isScanning" lines="none" class="ion-text-center">
+              <ion-label>
+                <ion-spinner name="dots" color="primary"></ion-spinner>
+                <p>Buscando dispositivos Bluetooth...</p>
+              </ion-label>
+            </ion-item>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <!-- ========================================= -->
+    <!-- TARJETA DE COMANDOS DE PRUEBA -->
+    <!-- ========================================= -->
+    <ion-row>
+      <ion-col size="12">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>
+              <ion-icon name="code-slash-outline"></ion-icon>
+              Comandos de Prueba
+            </ion-card-title>
+            <ion-card-subtitle>
+              Envía comandos al dispositivo conectado
+            </ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content>
+            <ion-grid class="ion-no-padding">
+              <ion-row>
+                <ion-col size="6">
+                  <ion-button 
+                    expand="full" 
+                    (click)="sendTestCommand()" 
+                    [disabled]="!isConnected"
+                    color="tertiary">
+                    <ion-icon name="flash-outline" slot="start"></ion-icon>
+                    TEST:PING
+                  </ion-button>
+                </ion-col>
+                <ion-col size="6">
+                  <ion-button 
+                    expand="full" 
+                    (click)="requestSTATS()" 
+                    [disabled]="!isConnected"
+                    color="secondary">
+                    <ion-icon name="stats-chart-outline" slot="start"></ion-icon>
+                    Solicitar D:
+                  </ion-button>
+                </ion-col>
+              </ion-row>
+
+              <!-- Input para comando personalizado -->
+              <ion-row class="ion-margin-top">
+                <ion-col size="12">
+                  <ion-item lines="full">
+                    <ion-label position="stacked">Comando Personalizado</ion-label>
+                    <ion-input 
+                      #customCommandInput
+                      type="text" 
+                      placeholder="Ej: RELAY_L:ON"
+                      [disabled]="!isConnected">
+                    </ion-input>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12">
+                  <ion-button 
+                    expand="full" 
+                    (click)="sendCustomCommand(customCommandInput.value || '')"; 
+                    [disabled]="!isConnected"
+                    color="primary">
+                    <ion-icon name="send-outline" slot="start"></ion-icon>
+                    Enviar Comando
+                  </ion-button>
+                </ion-col>
+              </ion-row>
+            </ion-grid>
+
+            <!-- Nota informativa -->
+            <ion-note *ngIf="!isConnected" color="medium">
+              <p class="ion-text-center ion-margin-top">
+                <ion-icon name="information-circle-outline"></ion-icon>
+                Conecta un dispositivo para enviar comandos
+              </p>
+            </ion-note>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <!-- ========================================= -->
+    <!-- TARJETA DE OPCIONES -->
+    <!-- ========================================= -->
+    <ion-row>
+      <ion-col size="12">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>
+              <ion-icon name="settings-outline"></ion-icon>
+              Opciones
+            </ion-card-title>
+          </ion-card-header>
+
+          <ion-card-content>
+            <ion-list [inset]="true" lines="full">
+              <!-- Modo Simulación -->
+              <ion-item>
+                <ion-icon name="code-working-outline" slot="start" [color]="simulationEnabled ? 'warning' : 'medium'"></ion-icon>
+                <ion-label>
+                  <h2>Modo Simulación</h2>
+                  <p>Simula conexión Bluetooth para desarrollo</p>
+                </ion-label>
+                <ion-toggle 
+                  slot="end"
+                  [checked]="simulationEnabled" 
+                  (ionChange)="onSimulationChange($event)"
+                  [color]="simulationEnabled ? 'warning' : 'primary'">
+                </ion-toggle>
+              </ion-item>
+
+              <!-- Auto-reconexión -->
+              <ion-item>
+                <ion-icon name="sync-outline" slot="start" [color]="autoReconnect ? 'success' : 'medium'"></ion-icon>
+                <ion-label>
+                  <h2>Auto-reconexión</h2>
+                  <p>Reconecta automáticamente si se pierde la conexión</p>
+                </ion-label>
+                <ion-toggle 
+                  slot="end"
+                  [checked]="autoReconnect" 
+                  (ionChange)="onAutoReconnectChange($event)"
+                  [color]="autoReconnect ? 'success' : 'medium'">
+                </ion-toggle>
+              </ion-item>
+
+              <!-- Estadísticas -->
+              <ion-item button (click)="updateStats()" detail>
+                <ion-icon name="analytics-outline" slot="start" color="primary"></ion-icon>
+                <ion-label>
+                  <h2>Actualizar Estadísticas</h2>
+                  <p>Última actualización: {{ stats.lastDataReceivedTime ? (stats.lastDataReceivedTime | date:'short') : 'Nunca' }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <!-- Espaciado inferior -->
+    <ion-row>
+      <ion-col size="12">
+        <div style="height: 20px;"></div>
+      </ion-col>
+    </ion-row>
+
+  </ion-grid>
+</ion-content>

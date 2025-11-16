@@ -1,0 +1,304 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+    <ion-title>⚙️ Configuración Bluetooth</ion-title>
+    <ion-buttons slot="end">
+      <!-- Asumo que esta función existe en el TS -->
+      <ion-button (click)="resetStatistics()" title="Resetear estadísticas">
+        <ion-icon name="stats-chart-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="bluetooth-outline"></ion-icon>
+        Estado del Adaptador
+        <ion-chip [color]="isConnected ? 'success' : 'danger'" slot="end">
+          <ion-label>{{ isConnected ? 'CONECTADO' : 'DESCONECTADO' }}</ion-label>
+        </ion-chip>
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      
+      <ion-list lines="none">
+        <!-- Mostrar estado del Bluetooth del dispositivo -->
+        <ion-item>
+          <ion-label [color]="isBluetoothEnabled ? 'success' : 'danger'">
+            Adaptador {{ isBluetoothEnabled ? 'listo' : 'apagado' }}
+          </ion-label>
+          <!-- Asumo que 'enableBluetooth' existe en el TS para pedir permisos/encender BT -->
+          <ion-button 
+            *ngIf="!isBluetoothEnabled"
+            (click)="enableBluetooth()" 
+            color="danger" 
+            size="small" 
+            slot="end"
+          >
+            Encender
+          </ion-button>
+        </ion-item>
+
+        <ion-item *ngIf="isConnected && connectedDevice">
+          <ion-label>Dispositivo actual:</ion-label>
+          <ion-note slot="end">{{ connectedDevice.name }} ({{ connectedDevice.address }})</ion-note>
+        </ion-item>
+
+        <ion-item *ngIf="!isConnected && lastDeviceAddress">
+          <ion-label>Último Dispositivo:</ion-label>
+          <ion-note slot="end">{{ lastDeviceAddress }}</ion-note>
+        </ion-item>
+
+        <ion-item *ngIf="!isConnected && !lastDeviceAddress">
+            <ion-label>Seleccione un dispositivo</ion-label>
+        </ion-item>
+        
+        <ion-item>
+          <ion-label>Auto-reconexión</ion-label>
+          <ion-toggle [checked]="autoReconnect" (ionChange)="onAutoReconnectChange($event)" slot="end"></ion-toggle>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>Modo Simulación (Pruebas)</ion-label>
+          <ion-toggle [checked]="simulationEnabled" (ionChange)="onSimulationChange($event)" slot="end"></ion-toggle>
+        </ion-item>
+
+        <ion-item *ngIf="isReconnecting">
+            <ion-label color="warning">
+                <ion-spinner name="dots"></ion-spinner> 
+                Intentando reconectar ({{ reconnectAttempts }}/{{ maxReconnectAttempts }})
+            </ion-label>
+            <!-- Asumo que 'cancelReconnection' existe en el TS -->
+            <ion-button (click)="cancelReconnection()" color="medium" size="small" slot="end">Cancelar</ion-button>
+        </ion-item>
+      </ion-list>
+      
+      <ion-grid class="ion-padding-top">
+          <ion-row>
+              <ion-col size="12">
+                  <!-- Botón Único para CONECTAR / DESCONECTAR -->
+                  <ion-button 
+                      expand="block"
+                      [color]="isConnected ? 'danger' : 'success'"
+                      [disabled]="!isBluetoothEnabled || isReconnecting || (!isConnected && !lastDeviceAddress)"
+                      (click)="isConnected ? disconnect() : connectLastDevice()"
+                  >
+                      <ng-container *ngIf="!isConnected">
+                          <ion-icon name="link-outline" slot="start"></ion-icon>
+                          Conectar {{ lastDeviceAddress ? 'a último' : '' }}
+                      </ng-container>
+                      
+                      <ng-container *ngIf="isConnected">
+                          <ion-icon name="unlink-outline" slot="start"></ion-icon>
+                          Desconectar
+                      </ng-container>
+                  </ion-button>
+              </ion-col>
+          </ion-row>
+      </ion-grid>
+
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        Dispositivos Emparejados
+        <ion-button 
+            (click)="loadPairedDevices()" 
+            [disabled]="isScanning || isDiscovering || !isBluetoothEnabled || isConnected"
+            color="secondary" 
+            fill="clear" 
+            slot="end"
+        >
+            <ion-icon [src]="'assets/icon/refresh-outline.svg'"  slot="icon-only" *ngIf="!isScanning"></ion-icon>
+            <ion-spinner *ngIf="isScanning" slot="icon-only" name="crescent"></ion-spinner>
+        </ion-button>
+      </ion-card-title>
+      <ion-card-subtitle *ngIf="!pairedDevices.length && !isScanning">
+        No se encontraron dispositivos emparejados.
+      </ion-card-subtitle>
+    </ion-card-header>
+    <ion-list *ngIf="pairedDevices.length">
+      <ion-item *ngFor="let device of pairedDevices">
+        <ion-label>
+          <h2>{{ device.name }}</h2>
+          <p>{{ device.address }}</p>
+        </ion-label>
+        <ion-button 
+            (click)="connectToDevice(device)" 
+            [disabled]="isConnected || isDiscovering || isReconnecting"
+            color="primary" 
+            size="small"
+        >
+          <ion-icon name="link-outline" slot="icon-only"></ion-icon>
+        </ion-button>
+      </ion-item>
+    </ion-list>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        Buscar Dispositivos (Escaneo)
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      
+      <ion-button 
+          expand="block"
+          (click)="scanForUnpaired()" 
+          [disabled]="isScanning || isDiscovering || isConnected || !isBluetoothEnabled"
+          color="secondary"
+      >
+          <ion-icon name="search-outline" slot="start"></ion-icon>
+          <span *ngIf="!isDiscovering">Buscar dispositivos no emparejados</span>
+          <span *ngIf="isDiscovering">Escaneando...</span>
+          <ion-spinner *ngIf="isDiscovering" name="dots" slot="end"></ion-spinner>
+      </ion-button>
+
+      <ion-list *ngIf="unpairedDevices.length">
+        <ion-list-header>
+          <ion-label>Resultados ({{ unpairedDevices.length }})</ion-label>
+        </ion-list-header>
+        <ion-item *ngFor="let device of unpairedDevices">
+          <ion-label>
+            <h2>{{ device.name || 'Sin nombre' }}</h2>
+            <p>{{ device.address }}</p>
+          </ion-label>
+          <ion-button 
+            (click)="pairAndConnect(device)" 
+            [disabled]="isConnected || isPairing"
+            color="success" 
+            size="small"
+          >
+            <ion-icon name="swap-vertical-outline" slot="icon-only"></ion-icon>
+          </ion-button>
+        </ion-item>
+      </ion-list>
+      <ion-note *ngIf="!unpairedDevices.length && !isDiscovering" class="ion-text-center ion-padding">
+        Presione 'Buscar' para encontrar nuevos dispositivos.
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+  
+  <hr>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="stats-chart-outline"></ion-icon>
+        Pruebas y Comandos
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      
+        <ion-item>
+  <ion-label>Distancia Actual (Izquierda / Derecha):</ion-label>
+
+  <!-- Distancia izquierda -->
+  <ion-chip color="tertiary" *ngIf="bluetoothService.distanceLeft$ | async as left">
+    Izq: {{ left }} cm
+  </ion-chip>
+  <ion-chip color="medium" *ngIf="!(bluetoothService.distanceLeft$ | async)">
+    Izq: N/A
+  </ion-chip>
+
+  <!-- Distancia derecha -->
+  <ion-chip color="tertiary" *ngIf="bluetoothService.distanceRight$ | async as right">
+    Der: {{ right }} cm
+  </ion-chip>
+  <ion-chip color="medium" *ngIf="!(bluetoothService.distanceRight$ | async)">
+    Der: N/A
+  </ion-chip>
+</ion-item>
+
+
+        <ion-grid>
+            <ion-row>
+                <ion-col size="6">
+                    <!-- Asumo que 'sendTestCommand' existe en el TS -->
+                    <ion-button expand="block" (click)="sendTestCommand()" [disabled]="!isConnected" color="medium">
+                        <ion-icon name="send-outline" slot="start"></ion-icon> TEST (V50)
+                    </ion-button>
+                </ion-col>
+                <ion-col size="6">
+                    <!-- Asumo que 'requestSTATS' existe en el TS -->
+                    <ion-button expand="block" (click)="requestSTATS()" [disabled]="!isConnected" color="medium">
+                        <ion-icon name="download-outline" slot="start"></ion-icon> STATS
+                    </ion-button>
+                </ion-col>
+            </ion-row>
+        </ion-grid>
+    </ion-card-content>
+  </ion-card>
+
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="time-outline"></ion-icon>
+        Estadísticas
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list lines="full">
+        <!-- Asumo que estas funciones y propiedades de 'statistics' existen en el TS -->
+        <ion-item>
+          <ion-label>Tiempo Conectado (Uptime)</ion-label>
+          <ion-note slot="end">{{ formatUptime() }}</ion-note>
+        </ion-item>
+        <ion-item>
+          <ion-label>Mensajes TX/RX</ion-label>
+          <ion-note slot="end">{{ statistics.messagesSent }} / {{ statistics.messagesReceived }}</ion-note>
+        </ion-item>
+        <ion-item>
+          <ion-label>Tasa de Éxito Conexión</ion-label>
+          <ion-note slot="end">{{ getSuccessRate() }}%</ion-note>
+        </ion-item>
+        <ion-item>
+          <ion-label>Errores totales</ion-label>
+          <ion-note slot="end">{{ statistics.errors }}</ion-note>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+        <ion-icon name="list-outline"></ion-icon>
+        Registro de Eventos (Logs)
+      </ion-card-title>
+      <!-- Asumo que 'exportLogs' y 'clearLogs' existen en el TS -->
+      <ion-button (click)="exportLogs()" fill="clear" color="secondary" size="small" slot="end">Exportar</ion-button>
+      <ion-button (click)="clearLogs()" fill="clear" color="danger" size="small" slot="end">Limpiar</ion-button>
+    </ion-card-header>
+    <ion-list>
+      <!-- Asumo que 'logs' es un array de objetos log con 'message', 'type', 'timestamp', 'bytes' -->
+      <ion-item *ngIf="!logs.length">
+        <ion-label class="ion-text-center ion-padding">Sin eventos</ion-label>
+      </ion-item>
+      <ion-item *ngFor="let log of logs; let i = index">
+        <!-- Asumo que 'getLogColor' y 'getLogIcon' existen en el TS -->
+        <ion-chip [color]="getLogColor(log.type)" slot="start" outline>
+            <ion-icon [name]="getLogIcon(log.type)"></ion-icon>
+        </ion-chip>
+        <ion-label>
+          <h3>{{ log.message }}</h3>
+          <p class="log-details">
+              <!-- Asumo que 'formatTime' existe en el TS -->
+              {{ formatTime(log.timestamp) }} | {{ log.type.toUpperCase() }}
+              <ion-badge *ngIf="log.bytes">{{ log.bytes }} B</ion-badge>
+          </p>
+        </ion-label>
+      </ion-item>
+    </ion-list>
+  </ion-card>
+</ion-content>
