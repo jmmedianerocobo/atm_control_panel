@@ -57,12 +57,13 @@ export class BluetoothService {
   public isSimulationEnabledSubject = new BehaviorSubject<boolean>(false);
   public isSimulationEnabled$ = this.isSimulationEnabledSubject.asObservable().pipe(shareReplay(1));
 
-  private readonly DEFAULT_THRESHOLD = 100;
+  private readonly DEFAULT_THRESHOLD = 30; // ✅ CORREGIDO: 30cm como en la UI
   private configurableThresholdSubject = new BehaviorSubject<number>(this.DEFAULT_THRESHOLD);
   public configurableThreshold$ = this.configurableThresholdSubject.asObservable();
 
+  // ✅ Filtrado optimizado
   private readonly EMA_ALPHA = 0.8; 
-  private readonly MIN_CHANGE_CM = 0; 
+  private readonly MIN_CHANGE_CM = 2;
   
   private emaValueLeft: number | null = null;
   private emaValueRight: number | null = null;
@@ -86,14 +87,16 @@ export class BluetoothService {
   public leftDistanceCm$ = this.distanceLeft$;
   public rightDistanceCm$ = this.distanceRight$;
 
-  // En BluetoothService
-  //public leftDistanceCm$ = this.distanceLeft$.pipe(shareReplay(1));
-  //public rightDistanceCm$ = this.distanceRight$.pipe(shareReplay(1));
-
+  // ✅ NUEVO: Estados de relés (sincronizados con Arduino)
+  public relayLeftStateSubject = new BehaviorSubject<boolean>(false);
+  public relayLeftState$ = this.relayLeftStateSubject.asObservable();
+  
+  public relayRightStateSubject = new BehaviorSubject<boolean>(false);
+  public relayRightState$ = this.relayRightStateSubject.asObservable();
 
   constructor(private ngZone: NgZone) {
-    console.log('%c[BT Service] 🚀 DUAL SENSOR CON LOGGING MEJORADO', 'background: #007bff; color: white; font-size: 16px; font-weight: bold');
-    this.addLog('🚀 Servicio DUAL-SENSOR inicializado');
+    console.log('%c[BT Service] 🚀 SISTEMA ESCLAVO v5.0', 'background: #007bff; color: white; font-size: 16px; font-weight: bold');
+    this.addLog('🚀 Servicio ESCLAVO inicializado v5.0 - Control desde Angular');
     (window as any).btService = this;
     this.checkConnectionAndReconnect();
 
@@ -137,7 +140,47 @@ export class BluetoothService {
       throw error;
     }
   }
+  
+  // ========================================
+  // ✅ MÉTODOS DE CONTROL DE RELÉ SIMPLIFICADOS
+  // ========================================
 
+  public activateLeft(): Promise<void> {
+    return this.sendCommand('activateLeft');
+  }
+
+  public deactivateLeft(): Promise<void> {
+    return this.sendCommand('deactivateLeft');
+  }
+
+  public activateRight(): Promise<void> {
+    return this.sendCommand('activateRight');
+  }
+
+  public deactivateRight(): Promise<void> {
+    return this.sendCommand('deactivateRight');
+  }
+
+  // ========================================
+  // ✅ MÉTODOS DE INFORMACIÓN
+  // ========================================
+
+  public requestStats(): Promise<void> {
+    return this.sendCommand('STATS');
+  }
+
+  public resetArduinoFilters(): Promise<void> {
+    return this.sendCommand('RESET_FILTER');
+  }
+
+  public requestStatus(): Promise<void> {
+    return this.sendCommand('STATUS');
+  }
+
+  // ========================================
+  // MÉTODOS DE ESCANEO Y CONEXIÓN
+  // ========================================
+  
   public async scanForUnpaired(): Promise<void> {
     if (typeof bluetoothSerial === 'undefined') {
       this.addLog('[SCAN] SIMULADO: Fin de escaneo (sin plugin)');
@@ -204,6 +247,8 @@ export class BluetoothService {
     this.dataReceivedCount = 0;
     this.distanceLeftSubject.next(null);
     this.distanceRightSubject.next(null);
+    this.relayLeftStateSubject.next(false);
+    this.relayRightStateSubject.next(false);
     this.resetDistanceTracking();
     this.addLog('🔄 Filtros y estadísticas reseteados');
   }
@@ -250,7 +295,7 @@ export class BluetoothService {
   }
 
   public async connect(deviceAddress: string): Promise<void> {
-     if (typeof bluetoothSerial === 'undefined' || this.isConnectedSubject.value) return;
+    if (typeof bluetoothSerial === 'undefined' || this.isConnectedSubject.value) return;
 
     const isEnabled = await this.isBluetoothEnabled();
     if (!isEnabled) {
@@ -274,6 +319,7 @@ export class BluetoothService {
                 address: deviceAddress 
               });
               this.addLog(`✓ Conectado a ${deviceAddress}`);
+              this.addLog('ℹ️ Arduino en modo ESCLAVO - control desde Angular');
               this.stopSimulation();
               this.subscribeToData();
               resolve();
@@ -310,6 +356,8 @@ export class BluetoothService {
       this.connectedDeviceSubject.next(null);
       this.distanceLeftSubject.next(null);
       this.distanceRightSubject.next(null);
+      this.relayLeftStateSubject.next(false);
+      this.relayRightStateSubject.next(false);
       this.currentDeviceId = null;
     });
 
@@ -328,7 +376,10 @@ export class BluetoothService {
     }
   }
 
-  // ⭐️ MEJORADO: Logging exhaustivo de datos recibidos
+  // ========================================
+  // PROCESAMIENTO DE DATOS BLUETOOTH
+  // ========================================
+  
   private subscribeToData(): void {
     if (typeof bluetoothSerial === 'undefined') return;
 
@@ -336,18 +387,12 @@ export class BluetoothService {
       (data: string) => {
         this.dataReceivedCount++;
         this.ngZone.run(() => {
-          // ⭐️ Log en consola con formato detallado
           console.group(`%c📩 RX #${this.dataReceivedCount}`, 'background: #4CAF50; color: white; padding: 2px 8px; font-weight: bold; font-size: 12px');
           console.log(`Datos:      "${data.trim()}"`);
-          console.log(`Longitud:   ${data.length} caracteres`);
-          console.log(`Hex:        ${Array.from(data).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' ')}`);
           console.log(`Timestamp:  ${new Date().toLocaleTimeString()}.${new Date().getMilliseconds()}`);
           console.groupEnd();
           
-          // ⭐️ Log en el array de logs (visible en UI)
           this.addLog(`📩 #${this.dataReceivedCount}: "${data.trim()}"`);
-          
-          // Procesar el dato
           this.handleIncomingData(data);
         });
       },
@@ -359,6 +404,8 @@ export class BluetoothService {
           this.connectedDeviceSubject.next(null);
           this.distanceLeftSubject.next(null);
           this.distanceRightSubject.next(null);
+          this.relayLeftStateSubject.next(false);
+          this.relayRightStateSubject.next(false);
         });
       }
     );
@@ -376,47 +423,90 @@ export class BluetoothService {
     }
   }
 
-  // ⭐️ MEJORADO: Logging detallado del procesamiento
   private handleIncomingData(rawData: string): void {
     const cleanData = rawData.trim();
-    
-    // Mensajes de control
-    if (!cleanData.toUpperCase().startsWith('LOG:')) {
-      console.log(`%c[BT] Control/Sistema`, 'background: #607D8B; color: white; padding: 2px 6px', cleanData);
-      this.addLog(`[RX-Control] ${cleanData}`);
-      return;
-    }
-    
     const parts = cleanData.split(':');
     
-    // Formato: LOG:SIDE:DISTANCE:STATUS
-    if (parts.length >= 4 && parts[0].toUpperCase() === 'LOG') {
-      const side = parts[1].toUpperCase();
-      const rawDistance = parseInt(parts[2], 10);
-      const status = parts[3] || 'OK';
-      
-      console.log(`%c[BT] Datos Parseados`, 'background: #00BCD4; color: black; padding: 2px 6px',
-                  `Side: ${side}, Distance: ${rawDistance}cm, Status: ${status}`);
-      
-      if (side === 'LEFT' || side === 'RIGHT') {
-        if (!isNaN(rawDistance) && rawDistance >= 0 && rawDistance <= 600) {
-          this.processSensorDistance(rawDistance, status, side);
-          this.addLog(`[RX-${side}] ${rawDistance}cm - ${status}`);
-        } else {
-          console.error(`%c[BT] Distancia inválida`, 'background: #f44336; color: white; padding: 2px 6px', rawDistance);
-          this.addLog(`[RX] ❌ Distancia inválida: ${rawDistance}cm`);
-        }
-      } else {
-        console.warn(`%c[BT] Lado no reconocido`, 'background: #FF9800; color: black; padding: 2px 6px', side);
-        this.addLog(`[RX] ⚠️ Lado no reconocido: ${side}`);
-      }
-    } else {
-      console.warn(`%c[BT] Formato desconocido`, 'background: #FF9800; color: black; padding: 2px 6px', cleanData);
-      this.addLog(`[RX] ⚠️ Formato: "${cleanData}"`);
+    if (parts.length === 0) return;
+    
+    const messageType = parts[0].toUpperCase();
+    
+    switch (messageType) {
+      case 'LOG':
+        this.handleLogMessage(parts);
+        break;
+      case 'ACK':
+        this.handleAckMessage(parts);
+        break;
+      case 'STATS':
+        this.handleStatsMessage(cleanData);
+        break;
+      case 'STATUS':
+        this.handleStatusMessage(parts);
+        break;
+      case 'ERROR':
+        this.handleErrorMessage(parts);
+        break;
+      default:
+        console.log(`%c[BT] Mensaje desconocido`, 'background: #607D8B; color: white; padding: 2px 6px', cleanData);
+        this.addLog(`[RX-Unknown] ${cleanData}`);
     }
   }
 
-  private processSensorDistance(rawDistance: number, status: string, side: 'LEFT' | 'RIGHT'): void {
+  // ✅ Formato nuevo: LOG:LEFT:150 o LOG:RIGHT:200
+  private handleLogMessage(parts: string[]): void {
+    if (parts.length < 3) return;
+    
+    const side = parts[1].toUpperCase();
+    const rawDistance = parseInt(parts[2], 10);
+    
+    console.log(`%c[BT] LOG`, 'background: #00BCD4; color: black; padding: 2px 6px',
+                `${side}: ${rawDistance}cm`);
+    
+    if ((side === 'LEFT' || side === 'RIGHT') && !isNaN(rawDistance) && rawDistance >= 0 && rawDistance <= 600) {
+      this.processSensorDistance(rawDistance, side);
+      this.addLog(`[RX-${side}] ${rawDistance}cm`);
+    }
+  }
+
+  // ✅ NUEVO: Procesar confirmaciones ACK:LEFT:ON, ACK:RIGHT:OFF, etc.
+  private handleAckMessage(parts: string[]): void {
+    if (parts.length < 3) return;
+    
+    const side = parts[1].toUpperCase();
+    const state = parts[2].toUpperCase();
+    
+    console.log(`%c[BT] ACK`, 'background: #4CAF50; color: white; padding: 2px 6px',
+                `${side}: ${state}`);
+    
+    if (side === 'LEFT') {
+      this.relayLeftStateSubject.next(state === 'ON');
+      this.addLog(`✅ ACK: Relé LEFT ${state}`);
+    } else if (side === 'RIGHT') {
+      this.relayRightStateSubject.next(state === 'ON');
+      this.addLog(`✅ ACK: Relé RIGHT ${state}`);
+    } else if (side === 'RESET_FILTER') {
+      this.addLog(`✅ ACK: Filtros reseteados`);
+    }
+  }
+
+  private handleStatsMessage(data: string): void {
+    console.log(`%c[BT] STATS`, 'background: #9C27B0; color: white; padding: 2px 6px', data);
+    this.addLog(`📊 ${data}`);
+  }
+
+  private handleStatusMessage(parts: string[]): void {
+    console.log(`%c[BT] STATUS`, 'background: #2196F3; color: white; padding: 2px 6px', parts.join(':'));
+    this.addLog(`ℹ️ STATUS: ${parts.slice(1).join(':')}`);
+  }
+
+  private handleErrorMessage(parts: string[]): void {
+    const errorMsg = parts.slice(1).join(':');
+    console.error(`%c[BT] ERROR`, 'background: #f44336; color: white; padding: 2px 6px', errorMsg);
+    this.addLog(`❌ ERROR: ${errorMsg}`);
+  }
+
+  private processSensorDistance(rawDistance: number, side: 'LEFT' | 'RIGHT'): void {
     const smoothedDistance = this.applyEMAFilter(rawDistance, side);
     
     console.log(`%c[Filtro] ${side}`, 'background: #9C27B0; color: white; padding: 2px 6px',
@@ -437,11 +527,6 @@ export class BluetoothService {
     } else {
       console.log(`%c[Filtro] ${side} ignorado`, 'background: #9E9E9E; color: white; padding: 2px 6px', 
                   `Cambio < ${this.MIN_CHANGE_CM}cm`);
-    }
-    
-    if (status === 'ALERTA') {
-      console.log(`%c⚠️ ALERTA ${side}`, 'background: #f44336; color: white; padding: 2px 6px; font-weight: bold', `${smoothedDistance}cm`);
-      this.addLog(`⚠️ ${side}: ${smoothedDistance}cm - ALERTA`);
     }
   }
 
@@ -507,6 +592,10 @@ export class BluetoothService {
     this.trackingStatsRight = updateSideTime(this.trackingStatsRight, distanceRight);
   }
 
+  // ========================================
+  // MODO SIMULACIÓN
+  // ========================================
+  
   private startSimulation(): void {
     this.stopSimulation();
     
@@ -523,8 +612,8 @@ export class BluetoothService {
         simDistanceLeft = Math.max(10, Math.min(300, simDistanceLeft + (Math.random() > 0.5 ? 2 : -2)));
         simDistanceRight = Math.max(10, Math.min(300, simDistanceRight + (Math.random() > 0.5 ? 1 : -1)));
 
-        this.processSensorDistance(simDistanceLeft, 'OK', 'LEFT');
-        this.processSensorDistance(simDistanceRight, simDistanceRight < this.configurableThresholdSubject.value ? 'ALERTA' : 'OK', 'RIGHT');
+        this.processSensorDistance(simDistanceLeft, 'LEFT');
+        this.processSensorDistance(simDistanceRight, 'RIGHT');
       });
     });
     console.log('%c[Simulación] ▶️ Iniciada', 'background: #FF9800; color: black; padding: 4px 8px; font-weight: bold');
@@ -540,6 +629,10 @@ export class BluetoothService {
     }
   }
 
+  // ========================================
+  // UTILIDADES
+  // ========================================
+  
   public async isBluetoothEnabled(): Promise<boolean> {
     if (typeof bluetoothSerial === 'undefined') return true;
     
@@ -553,7 +646,7 @@ export class BluetoothService {
   }
   
   public async checkConnectionAndReconnect(): Promise<void> {
-     if (typeof bluetoothSerial === 'undefined' || this.isSimulationEnabledSubject.value) return;
+    if (typeof bluetoothSerial === 'undefined' || this.isSimulationEnabledSubject.value) return;
     
     const isCurrentlyConnected = await new Promise<boolean>((resolve) => {
       bluetoothSerial.isConnected(() => resolve(true), () => resolve(false));

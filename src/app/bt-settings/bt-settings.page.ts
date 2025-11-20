@@ -169,7 +169,7 @@ export class BtSettingsPage implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.addLog('info', '🚀 Sistema iniciado');
+    this.addLog('info', '🚀 Sistema inicializado v5.0 - Modo ESCLAVO');
     this.loadSettings();
     this.checkBluetoothStatus();
     this.startConnectionMonitoring();
@@ -420,7 +420,9 @@ export class BtSettingsPage implements OnInit, OnDestroy {
     }
   }
 
-  // ⭐️ MODIFICADO: Ahora envía comando de inicio automáticamente
+  // ========================================
+  // ✅ ACTUALIZADO: Conexión sin START automático
+  // ========================================
   async connectToDevice(device: BluetoothDevice, isReconnect: boolean = false) {
     if (typeof bluetoothSerial === 'undefined') return;
 
@@ -442,8 +444,23 @@ export class BtSettingsPage implements OnInit, OnDestroy {
         this.addLog('success', `✓ Conectado a ${device.name}`);
       }
       
-      // ⭐️ CRÍTICO: Enviar comando para iniciar transmisión
-      await this.startDataTransmission();
+      // ✅ ACTUALIZADO: Mensajes del nuevo sistema
+      this.addLog('info', '✓ Conexión establecida. Arduino en modo ESCLAVO.');
+      this.addLog('info', 'ℹ️ Control de relés desde Angular via toggles.');
+      
+      // Solicitar estado actual del Arduino
+      setTimeout(() => {
+        this.requestArduinoStatus();
+        
+        // Verificar llegada de datos
+        const stats = this.bluetoothService.getStats();
+        if (stats.dataReceivedCount === 0) {
+          this.addLog('warning', '⚠️ No se reciben datos del Arduino.');
+          this.addLog('info', 'ℹ️ El Arduino envía datos automáticamente cada 100ms.');
+        } else {
+          this.addLog('success', `✅ Recibidos ${stats.dataReceivedCount} mensajes`);
+        }
+      }, 1500);
       
       this.saveSettings();
     } catch (error) {
@@ -452,44 +469,6 @@ export class BtSettingsPage implements OnInit, OnDestroy {
       this.isConnected = false;
       this.connectedDevice = null;
       throw error;
-    }
-  }
-
-  // ⭐️ NUEVO: Inicia la transmisión de datos del HC-06
-  private async startDataTransmission() {
-    try {
-      // Esperar para que la conexión se estabilice
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      this.addLog('info', '📡 Iniciando transmisión de datos...');
-      
-      // ⭐️ PRUEBA ESTOS COMANDOS EN ORDEN:
-      // 1. START (comando común)
-      await this.bluetoothService.sendCommand('START');
-      
-      // Si no funciona, descomenta y prueba estos:
-      // await this.bluetoothService.sendCommand('S');
-      // await this.bluetoothService.sendCommand('BEGIN');
-      // await this.bluetoothService.sendCommand('1');
-      // await this.bluetoothService.sendCommand('G'); // "GO"
-      
-      this.addLog('success', '✓ Comando de inicio enviado');
-      
-      // ⭐️ DIAGNÓSTICO: Esperar 3 segundos y verificar si llegaron datos
-      setTimeout(() => {
-        const stats = this.bluetoothService.getStats();
-        if (stats.dataReceivedCount === 0) {
-          this.addLog('warning', '⚠️ No se reciben datos. Verifica:');
-          this.addLog('warning', '   1. El comando de inicio correcto');
-          this.addLog('warning', '   2. El HC-06 está configurado para enviar');
-          this.addLog('warning', '   3. La velocidad de baudios coincide');
-        } else {
-          this.addLog('success', `✅ Recibidos ${stats.dataReceivedCount} mensajes`);
-        }
-      }, 3000);
-      
-    } catch (error) {
-      this.addLog('warning', `⚠️ No se pudo enviar comando de inicio: ${error}`);
     }
   }
 
@@ -532,12 +511,22 @@ export class BtSettingsPage implements OnInit, OnDestroy {
     }
   }
   
+  // ========================================
+  // ✅ MÉTODOS DE PRUEBA ACTUALIZADOS
+  // ========================================
+  
   async sendTestCommand() {
     await this.sendCommand('V50');
   }
 
   async requestSTATS() {
     await this.sendCommand('STATS');
+  }
+
+  // ✅ NUEVO: Solicitar estado actual del Arduino
+  async requestArduinoStatus() {
+    await this.sendCommand('STATUS');
+    this.addLog('info', '📊 Solicitando estado del Arduino');
   }
 
   async requestRuntimePermissions(): Promise<boolean> {

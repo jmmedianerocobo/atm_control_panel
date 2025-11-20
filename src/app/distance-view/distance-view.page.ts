@@ -1,5 +1,3 @@
-// src/app/distance-view/distance-view.page.ts
-
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, interval, combineLatest, Subscription } from 'rxjs';
 import { map, startWith, distinctUntilChanged } from 'rxjs/operators';
@@ -45,9 +43,14 @@ export class DistanceViewPage implements OnInit, OnDestroy {
 
   // Interruptores
   public toggleLeftActive: boolean = true;
-  public toggleRightActive: boolean = false;
+  public toggleRightActive: boolean = true;
 
   private distanceSubscription: Subscription | undefined;
+  private signalSubscription: Subscription | undefined;
+
+  // Variables de estado para la lógica de activación de señales
+  private wasLeftBelowThreshold: boolean = false;
+  private wasRightBelowThreshold: boolean = false;
 
   private readonly DEBOUNCE_TIME_MS: number = 1000;
 
@@ -66,8 +69,55 @@ export class DistanceViewPage implements OnInit, OnDestroy {
       this.thresholdCm = threshold;
     });
 
+    // ===================================
+    // LÓGICA DE ACTIVACIÓN/DESACTIVACIÓN DE SEÑALES
+    // ===================================
+    this.signalSubscription = combineLatest([
+      this.distanceLeft$.pipe(distinctUntilChanged()),
+      this.distanceRight$.pipe(distinctUntilChanged())
+    ]).subscribe(([leftDistance, rightDistance]) => {
+        // --- Lado Izquierdo ---
+        if (leftDistance !== null && this.toggleLeftActive) {
+          const isLeftBelowThreshold = leftDistance < this.thresholdCm;
+
+          if (isLeftBelowThreshold && !this.wasLeftBelowThreshold) {
+            // Transición: De fuera a dentro del umbral -> ACTIVA
+            this.bluetoothService.sendCommand('activateLeft');
+            console.log('SEÑAL: activateLeft enviada.');
+          } else if (!isLeftBelowThreshold && this.wasLeftBelowThreshold) {
+            // Transición: De dentro a fuera del umbral -> DESACTIVA
+            this.bluetoothService.sendCommand('deactivateLeft');
+            console.log('SEÑAL: deactivateLeft enviada.');
+          }
+          this.wasLeftBelowThreshold = isLeftBelowThreshold;
+        } else if (!this.toggleLeftActive) {
+          // Si el toggle está inactivo, resetea el estado para la próxima activación
+          this.wasLeftBelowThreshold = false;
+        }
+
+        // --- Lado Derecho ---
+        if (rightDistance !== null && this.toggleRightActive) {
+          const isRightBelowThreshold = rightDistance < this.thresholdCm;
+
+          if (isRightBelowThreshold && !this.wasRightBelowThreshold) {
+            // Transición: De fuera a dentro del umbral -> ACTIVA
+            this.bluetoothService.sendCommand('activateRight');
+            console.log('SEÑAL: activateRight enviada.');
+          } else if (!isRightBelowThreshold && this.wasRightBelowThreshold) {
+            // Transición: De dentro a fuera del umbral -> DESACTIVA
+            this.bluetoothService.sendCommand('deactivateRight');
+            console.log('SEÑAL: deactivateRight enviada.');
+          }
+          this.wasRightBelowThreshold = isRightBelowThreshold;
+        } else if (!this.toggleRightActive) {
+          // Si el toggle está inactivo, resetea el estado para la próxima activación
+          this.wasRightBelowThreshold = false;
+        }
+    });
+    // ===================================
+
     // =====================
-    // LÓGICA LADO IZQUIERDO
+    // LÓGICA LADO IZQUIERDO (Conteo de tiempo y detecciones)
     // =====================
     let startTimeLeft: number | null = null;
     let accumulatedTimeLeft = 0;
@@ -80,6 +130,16 @@ export class DistanceViewPage implements OnInit, OnDestroy {
       interval(100).pipe(startWith(0))
     ]).pipe(
       map(([distance, _]) => {
+        if (!this.toggleLeftActive) {
+          // Si el toggle está OFF, detenemos cualquier sesión de conteo activa
+          if (wasBelow30Left && startTimeLeft) {
+            accumulatedTimeLeft += (Date.now() - startTimeLeft) / 1000;
+            startTimeLeft = null;
+          }
+          wasBelow30Left = false;
+          return accumulatedTimeLeft;
+        }
+        
         const isBelow30 = distance !== null && distance < this.thresholdCm;
 
         if (isBelow30) {
@@ -108,6 +168,10 @@ export class DistanceViewPage implements OnInit, OnDestroy {
       map(distance => distance !== null && distance < this.thresholdCm),
       distinctUntilChanged(),
       map(isBelow30 => {
+        if (!this.toggleLeftActive) {
+          return detectionCounterLeft;
+        }
+
         const currentTime = Date.now();
         if (isBelow30) {
           if (currentTime - lastTransitionTimeLeft > this.DEBOUNCE_TIME_MS) {
@@ -121,7 +185,7 @@ export class DistanceViewPage implements OnInit, OnDestroy {
     );
 
     // =====================
-    // LÓGICA LADO DERECHO
+    // LÓGICA LADO DERECHO (Conteo de tiempo y detecciones)
     // =====================
     let startTimeRight: number | null = null;
     let accumulatedTimeRight = 0;
@@ -134,6 +198,15 @@ export class DistanceViewPage implements OnInit, OnDestroy {
       interval(100).pipe(startWith(0))
     ]).pipe(
       map(([distance, _]) => {
+        if (!this.toggleRightActive) {
+          if (wasBelow30Right && startTimeRight) {
+            accumulatedTimeRight += (Date.now() - startTimeRight) / 1000;
+            startTimeRight = null;
+          }
+          wasBelow30Right = false;
+          return accumulatedTimeRight;
+        }
+        
         const isBelow30 = distance !== null && distance < this.thresholdCm;
 
         if (isBelow30) {
@@ -162,6 +235,10 @@ export class DistanceViewPage implements OnInit, OnDestroy {
       map(distance => distance !== null && distance < this.thresholdCm),
       distinctUntilChanged(),
       map(isBelow30 => {
+        if (!this.toggleRightActive) {
+          return detectionCounterRight;
+        }
+
         const currentTime = Date.now();
         if (isBelow30) {
           if (currentTime - lastTransitionTimeRight > this.DEBOUNCE_TIME_MS) {
@@ -177,6 +254,7 @@ export class DistanceViewPage implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.distanceSubscription?.unsubscribe();
+    this.signalSubscription?.unsubscribe();
   }
 
   private formatTime(totalSeconds: number): string {
@@ -203,13 +281,64 @@ export class DistanceViewPage implements OnInit, OnDestroy {
     this.router.navigate(['/bt-settings']);
   }
 
+  // ========================================
+  // 🆕 CONTROL DE TOGGLES CORREGIDO
+  // ========================================
   onToggleChange(column: 'left' | 'right') {
     if (column === 'left') {
       console.log(`Interruptor Lado Izquierdo: ${this.toggleLeftActive ? 'ACTIVADO' : 'DESACTIVADO'}`);
-      this.bluetoothService.sendCommand(`TOGGLE_LEFT:${this.toggleLeftActive ? 'ON' : 'OFF'}`);
-    } else if (column === 'right') {
+      
+      if (this.toggleLeftActive) {
+        // ✅ Toggle ACTIVADO
+        this.bluetoothService.sendCommand(`TOGGLE_LEFT:ON`);
+        
+        // Si hay un objeto dentro del umbral al momento de activar, activar inmediatamente
+        const currentDistance = this.bluetoothService.distanceLeftSubject.value;
+        if (currentDistance !== null && currentDistance < this.thresholdCm) {
+          this.bluetoothService.sendCommand('activateLeft');
+          this.wasLeftBelowThreshold = true;
+          console.log('SEÑAL: activateLeft (activación inmediata por toggle ON con objeto presente).');
+        }
+      } else {
+        // ✅ Toggle DESACTIVADO
+        this.bluetoothService.sendCommand(`TOGGLE_LEFT:OFF`);
+        
+        // ✅ CORRECCIÓN CRÍTICA: NO enviar deactivateLeft
+        // El comando TOGGLE_LEFT:OFF resetea el Arduino a modo automático
+        // Si es necesario apagar el relé, el Arduino lo hará automáticamente
+        
+        console.log('SEÑAL: TOGGLE_LEFT:OFF enviada. Arduino resetea a modo automático.');
+        
+        // Resetear estado interno para la próxima activación
+        this.wasLeftBelowThreshold = false;
+      }
+    } 
+    else if (column === 'right') {
       console.log(`Interruptor Lado Derecho: ${this.toggleRightActive ? 'ACTIVADO' : 'DESACTIVADO'}`);
-      this.bluetoothService.sendCommand(`TOGGLE_RIGHT:${this.toggleRightActive ? 'ON' : 'OFF'}`);
+      
+      if (this.toggleRightActive) {
+        // ✅ Toggle ACTIVADO
+        this.bluetoothService.sendCommand(`TOGGLE_RIGHT:ON`);
+        
+        // Si hay un objeto dentro del umbral al momento de activar, activar inmediatamente
+        const currentDistance = this.bluetoothService.distanceRightSubject.value;
+        if (currentDistance !== null && currentDistance < this.thresholdCm) {
+          this.bluetoothService.sendCommand('activateRight');
+          this.wasRightBelowThreshold = true;
+          console.log('SEÑAL: activateRight (activación inmediata por toggle ON con objeto presente).');
+        }
+      } else {
+        // ✅ Toggle DESACTIVADO
+        this.bluetoothService.sendCommand(`TOGGLE_RIGHT:OFF`);
+        
+        // ✅ CORRECCIÓN CRÍTICA: NO enviar deactivateRight
+        // El comando TOGGLE_RIGHT:OFF resetea el Arduino a modo automático
+        
+        console.log('SEÑAL: TOGGLE_RIGHT:OFF enviada. Arduino resetea a modo automático.');
+        
+        // Resetear estado interno para la próxima activación
+        this.wasRightBelowThreshold = false;
+      }
     }
   }
 }
