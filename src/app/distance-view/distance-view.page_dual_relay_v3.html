@@ -1,0 +1,125 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>ATM Control Panel</ion-title>
+
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/distance-view"></ion-back-button>
+    </ion-buttons>
+
+    <ion-buttons slot="end">
+      <!-- ⚙️ Configuración automática -->
+      <ion-button (click)="openConfigPage()" fill="clear">
+        <ion-icon name="settings-outline"></ion-icon>
+      </ion-button>
+
+      <ion-button (click)="goToBluetoothSettings()" color="secondary" fill="outline" size="small">
+        Ajustes BT
+      </ion-button>
+
+      <ion-chip [color]="(isConnected$ | async) ? 'success' : 'danger'">
+        <ion-label>{{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}</ion-label>
+      </ion-chip>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <div class="two-column-container">
+
+    <!-- ================= LEFT ================= -->
+    <div class="column">
+
+      <h2 class="column-title toggle-left">
+        <ion-toggle
+          mode="ios"
+          color="primary"
+          [checked]="toggleLeftActive"
+          (ionChange)="toggleLeftActive = $event.detail.checked">
+        </ion-toggle>
+        <span>Lado Izquierdo</span>
+      </h2>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-subtitle>Distancia detectada</ion-card-subtitle>
+        </ion-card-header>
+
+        <ion-card-content class="distance-display">
+
+          <div class="distance-row">
+
+            <!-- ICONO IZQUIERDA -->
+            <div class="icon-green"
+                 *ngIf="(distanceLeft$ | async) !== null && (distanceLeft$ | async)! < thresholdCm">
+              <ion-icon name="checkmark-circle" color="success" style="font-size:48px"></ion-icon>
+            </div>
+
+            <!-- VALOR -->
+            <div>
+              <ng-container *ngIf="(distanceLeft$ | async) !== null; else waitL">
+                <h2 class="distance-value">
+                  {{ (distanceLeft$ | async) | number:'1.0-0' }} cm
+                </h2>
+              </ng-container>
+              <ng-template #waitL>Esperando datos...</ng-template>
+            </div>
+
+          </div>
+
+        </ion-card-content>
+      </ion-card>
+
+    </div>
+
+    <!-- ================= RIGHT ================= -->
+    <div class="column">
+
+      <h2 class="column-title toggle-right">
+        <span>Lado Derecho</span>
+        <ion-toggle
+          mode="ios"
+          color="primary"
+          [checked]="toggleRightActive"
+          (ionChange)="toggleRightActive = $event.detail.checked">
+        </ion-toggle>
+      </h2>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-subtitle>Distancia detectada</ion-card-subtitle>
+        </ion-card-header>
+
+        <ion-card-content class="distance-display">
+
+          <div class="distance-row">
+
+            <!-- VALOR -->
+            <div>
+              <ng-container *ngIf="(distanceRight$ | async) !== null; else waitR">
+                <h2 class="distance-value">
+                  {{ (distanceRight$ | async) | number:'1.0-0' }} cm
+                </h2>
+              </ng-container>
+              <ng-template #waitR>Esperando datos...</ng-template>
+            </div>
+
+            <!-- ICONO DERECHA -->
+            <div class="icon-green"
+                 *ngIf="(distanceRight$ | async) !== null && (distanceRight$ | async)! < thresholdCm">
+              <ion-icon name="checkmark-circle" color="success" style="font-size:48px"></ion-icon>
+            </div>
+
+          </div>
+
+        </ion-card-content>
+      </ion-card>
+
+    </div>
+
+  </div>
+
+</ion-content>
+
+
+

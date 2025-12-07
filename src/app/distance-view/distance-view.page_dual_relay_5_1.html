@@ -7,6 +7,7 @@
     </ion-buttons>
 
     <ion-buttons slot="end">
+
       <!-- Configuración -->
       <ion-button (click)="openConfigPage()" fill="clear">
         <ion-icon src="/assets/icon/settings-outline.svg"></ion-icon>
@@ -27,9 +28,11 @@
           {{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}
         </ion-label>
       </ion-chip>
+
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
+
 
 <ion-content class="ion-padding">
 
@@ -38,49 +41,48 @@
     <!-- ========================================================= -->
     <!-- ========================== LEFT ========================= -->
     <!-- ========================================================= -->
+
     <div class="column panel-container">
 
       <div class="panel-header">Lado Izquierdo</div>
 
       <div class="panel-body">
 
-        
+        <!-- Icono aspersor con fondo dinámico -->
+        <div class="spray-icon left-icon"
+          [ngClass]="{
+            'bg-success': (distanceLeft$ | async)! < (thresholdCm$ | async)!,
+            'bg-danger':  (distanceLeft$ | async)! >= (thresholdCm$ | async)!
+          }">
+          <img src="assets/icon/spray_izda_transp.svg" alt="Left Spray" />
+        </div>
 
         <!-- Estado -->
         <div class="info-block">
-  <label>Distancia</label>
+          <label>Distancia</label>
 
-  <div class="distance-row">
+          <div class="status-line">
 
-    <!-- ICONO a la izquierda -->
-    <ng-container *ngIf="(distanceLeft$ | async) as distLeft; else noIcon">
-      <div 
-        class="spray-icon-mini bg-success"
-        *ngIf="distLeft < (thresholdCm$ | async)!">
-        <img src="assets/icon/spray_izda_transp.svg" />
-      </div>
+            <ion-icon
+              name="ellipse"
+              [color]="
+                (distanceLeft$ | async)! < (thresholdCm$ | async)!
+                  ? 'success'
+                  : 'medium'
+              "
+            ></ion-icon>
 
-      <!-- Si NO se debe mostrar, se deja hueco -->
-      <div *ngIf="distLeft >= (thresholdCm$ | async)!" class="spray-icon-mini hidden"></div>
-    </ng-container>
+            <span *ngIf="(distanceLeft$ | async) !== null">
+              {{ (distanceLeft$ | async)! < (thresholdCm$ | async)! ? 'ACTIVO' : 'INACTIVO' }}
+              -
+              {{ (distanceLeft$ | async) | number:'1.0-0' }} cm
+            </span>
 
-    <!-- Si no hay datos -->
-    <ng-template #noIcon>
-      <div class="spray-icon-mini hidden"></div>
-    </ng-template>
-
-    <!-- VALOR a la derecha -->
-    <div class="distance-value">
-      <ng-container *ngIf="distanceLeft$ | async as distLeft; else noLeft">
-       <h1> {{ distLeft }} cm</h1>
-      </ng-container>
-
-      <ng-template #noLeft>- - -</ng-template>
-    </div>
-
-  </div>
-</div>
-
+            <span *ngIf="(distanceLeft$ | async) === null">
+              SIN DATOS
+            </span>
+          </div>
+        </div>
 
         <!-- Tiempo apertura -->
         <div class="info-block">
@@ -94,60 +96,60 @@
           <div class="value">{{ openCountLeft }}</div>
         </div>
 
-        <!-- Litros -->
+        <!-- Litros aplicados -->
         <div class="info-block">
           <label>Litros Aplicados lado Izquierdo</label>
           <div class="value">{{ litersLeft | number:'1.2-2' }}</div>
         </div>
+
       </div>
     </div>
 
     <!-- ========================================================= -->
     <!-- ========================== RIGHT ======================== -->
     <!-- ========================================================= -->
+
     <div class="column panel-container">
 
       <div class="panel-header">Lado Derecho</div>
 
       <div class="panel-body">
 
-        
+        <!-- Icono aspersor con fondo dinámico -->
+        <div class="spray-icon right-icon"
+          [ngClass]="{
+            'bg-success': (distanceRight$ | async)! < (thresholdCm$ | async)!,
+            'bg-danger':  (distanceRight$ | async)! >= (thresholdCm$ | async)!
+          }">
+          <img src="assets/icon/spray_dcha_transp.svg" alt="Right Spray" />
+        </div>
 
         <!-- Estado -->
         <div class="info-block">
-  <label>Distancia</label>
+          <label>Distancia</label>
 
-  <div class="distance-row">
+          <div class="status-line">
 
-    <!-- 🔹 DISTANCIA A LA IZQUIERDA -->
-    <div class="distance-value">
-      <ng-container *ngIf="distanceRight$ | async as distRight; else noRight">
-        {{ distRight }} cm
-      </ng-container>
-      <ng-template #noRight>- - -</ng-template>
-    </div>
+            <ion-icon
+              name="ellipse"
+              [color]="
+                (distanceRight$ | async)! < (thresholdCm$ | async)!
+                  ? 'success'
+                  : 'medium'
+              "
+            ></ion-icon>
 
-    <!-- 🔹 ICONO A LA DERECHA -->
-    <ng-container *ngIf="(distanceRight$ | async) as distRight; else noIcon">
-      
-      <!-- Icono visible si está por debajo del umbral -->
-      <div 
-        class="spray-icon-mini bg-success"
-        *ngIf="distRight < (thresholdCm$ | async)!">
-        <img src="assets/icon/spray_dcha_transp.svg" />
-      </div>
+            <span *ngIf="(distanceRight$ | async) !== null">
+              {{ (distanceRight$ | async)! < (thresholdCm$ | async)! ? 'ACTIVO' : 'INACTIVO' }}
+              -
+              {{ (distanceRight$ | async) | number:'1.0-0' }} cm
+            </span>
 
-      <!-- Si NO debe mostrarse: se reserva el hueco -->
-      <div *ngIf="distRight >= (thresholdCm$ | async)!" class="spray-icon-mini hidden"></div>
-
-    </ng-container>
-
-    <ng-template #noIcon>
-      <div class="spray-icon-mini hidden"></div>
-    </ng-template>
-
-  </div>
-</div>
+            <span *ngIf="(distanceRight$ | async) === null">
+              SIN DATOS
+            </span>
+          </div>
+        </div>
 
         <!-- Tiempo apertura -->
         <div class="info-block">
@@ -161,7 +163,7 @@
           <div class="value">{{ openCountRight }}</div>
         </div>
 
-        <!-- Litros -->
+        <!-- Litros aplicados -->
         <div class="info-block">
           <label>Litros Aplicados lado Derecho</label>
           <div class="value">{{ litersRight | number:'1.2-2' }}</div>
@@ -169,6 +171,7 @@
 
       </div>
     </div>
+
   </div>
 
   <div class="total-panel">
@@ -177,6 +180,3 @@
   </div>
 
 </ion-content>
-
-
-

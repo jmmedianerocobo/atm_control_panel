@@ -1,0 +1,90 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Configuración</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/distance-view"></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <ion-list class="config-list">
+
+    <!-- =============== MODO (TOGGLE) =============== -->
+    <ion-item lines="full">
+      <ion-label>
+        <h2>Modo de funcionamiento</h2>
+        <p>{{ mode === 0 ? 'Detección por distancia' : 'Temporizado' }}</p>
+      </ion-label>
+
+      <ion-toggle
+        slot="end"
+        color="success"
+        [checked]="mode === 1"
+        (ionChange)="mode = $event.detail.checked ? 1 : 0">
+      </ion-toggle>
+    </ion-item>
+
+    <!-- =============== TEMPORIZADOR (solo en MODO 1) =============== -->
+    <ion-item 
+      *ngIf="mode === 1"
+      button 
+      detail 
+      (click)="openPicker('active')">
+      <ion-label>
+        <h2>Tiempo Activo (ms)</h2>
+        <p>Duración de activación del relé</p>
+      </ion-label>
+      <ion-note slot="end">{{ activeTimeMs }} ms</ion-note>
+    </ion-item>
+
+    <!-- =============== LITROS POR MINUTO =============== -->
+    <ion-item button detail (click)="openPicker('liters')">
+      <ion-label>
+        <h2>Litros por minuto</h2>
+        <p>Caudal del sistema</p>
+      </ion-label>
+      <ion-note slot="end">{{ litersPerMin }} L/min</ion-note>
+    </ion-item>
+
+    <!-- =============== NÚMERO DE APLICADORES =============== -->
+    <ion-item button detail (click)="openPicker('applicators')">
+      <ion-label>
+        <h2>Número de aplicadores</h2>
+        <p>Total de boquillas utilizadas</p>
+      </ion-label>
+      <ion-note slot="end">{{ numApplicators }}</ion-note>
+    </ion-item>
+
+    <!-- =============== UMBRAL =============== -->
+    <ion-item button detail (click)="openPicker('threshold')">
+      <ion-label><h2>Umbral (cm)</h2></ion-label>
+      <ion-note slot="end">{{ thresholdCm }} cm</ion-note>
+    </ion-item>
+
+    <!-- =============== HISTÉRESIS =============== -->
+    <ion-item button detail (click)="openPicker('hysteresis')">
+      <ion-label><h2>Histéresis (cm)</h2></ion-label>
+      <ion-note slot="end">{{ hysteresisCm }} cm</ion-note>
+    </ion-item>
+
+    <!-- =============== HOLD TIME =============== -->
+    <ion-item button detail (click)="openPicker('hold')">
+      <ion-label><h2>Hold (ms)</h2></ion-label>
+      <ion-note slot="end">{{ holdTimeMs }} ms</ion-note>
+    </ion-item>
+
+  </ion-list>
+
+  <ion-button expand="block" color="primary" (click)="applyConfig()">
+    Guardar configuración
+  </ion-button>
+
+</ion-content>
+
+
+
+
+
+

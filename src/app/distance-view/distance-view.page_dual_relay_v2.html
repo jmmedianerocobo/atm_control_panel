@@ -1,0 +1,187 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>ATM Control Panel</ion-title>
+
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+
+    <ion-buttons slot="end">
+      <ion-button (click)="goToBluetoothSettings()" color="secondary" fill="outline" size="small">
+        Ajustes BT
+      </ion-button>
+
+      <ion-chip [color]="(isConnected$ | async) ? 'success' : 'danger'">
+        <ion-label>{{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}</ion-label>
+      </ion-chip>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+
+  <div class="two-column-container">
+
+    <div class="column">
+      
+      <h2 class="column-title toggle-left">
+        <!-- ✅ CORREGIDO: Cambiado de [(ngModel)] a [checked] y añadido $event -->
+        <ion-toggle 
+          mode="ios" 
+          color="primary" 
+          [checked]="toggleLeftActive" 
+          (ionChange)="toggleLeftActive = $event.detail.checked; onToggleChange('left')">
+        </ion-toggle>
+        <span>Lado Izquierdo</span>
+      </h2>
+      
+      <div class="ion-text-center">
+
+        <ion-card>
+          <ion-card-header>
+            <ion-card-subtitle class="subtitle-style">Distancia detectada por el sensor</ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content class="distance-display">
+            
+            <div class="distance-row">
+                <!-- ⭐️ Icono (solo si hay distancia y está debajo del umbral) -->
+                <div class="icon_class"
+                      *ngIf="(distanceLeft$ | async) !== null && (distanceLeft$ | async)! < thresholdCm">
+                  <ion-icon 
+                      [src]="'assets/icon/spray_izda_transp.svg'" 
+                      class="sensor-icon">
+                  </ion-icon>
+                </div>
+
+                <!-- ⭐️ Texto de distancia o mensaje de espera -->
+                <div class="text_class">
+                  <ng-container *ngIf="(distanceLeft$ | async) !== null; else waiting">
+                    <h2 class="distance-value">
+                      {{ (distanceLeft$ | async) | number:'1.0-0' }} cm
+                    </h2>
+                  </ng-container>
+                  <ng-template #waiting>
+                    <p class="waiting-data">Esperando datos...</p>
+                  </ng-template>
+                </div>
+            </div>
+
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+          <ion-card-header>
+            <ion-card-subtitle class="subtitle-style">Tiempo total de apertura</ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content>
+            <h2 class="distance-value">
+              {{ formattedTimeLeft$ | async }}
+            </h2>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+          <ion-card-header>
+            <ion-card-subtitle class="subtitle-style">Número de detecciones</ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content>
+            <h2 class="distance-value">
+              {{ detectionCountLeft$ | async }}
+            </h2>
+          </ion-card-content>
+        </ion-card>
+
+      </div>
+    </div>
+
+    <div class="column">
+      
+      <h2 class="column-title toggle-right">
+        <span>Lado Derecho</span>
+        <!-- ✅ CORREGIDO: Cambiado de [(ngModel)] a [checked] y añadido $event -->
+        <ion-toggle 
+          mode="ios" 
+          color="primary" 
+          [checked]="toggleRightActive" 
+          (ionChange)="toggleRightActive = $event.detail.checked; onToggleChange('right')">
+        </ion-toggle>
+      </h2>
+      
+      <div class="ion-text-center">
+
+        <ion-card>
+          <ion-card-header>
+            <ion-card-subtitle class="subtitle-style">Distancia detectada por el sensor</ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content class="distance-display">
+            
+            <div class="distance-row">
+                <!-- ⭐️ Texto de distancia o mensaje de espera -->
+                <div class="text_class">
+                  <ng-container *ngIf="(distanceRight$ | async) !== null; else waitingRight">
+                    <h2 class="distance-value">
+                      {{ (distanceRight$ | async) | number:'1.0-0' }} cm
+                    </h2>
+                  </ng-container>
+                  <ng-template #waitingRight>
+                    <p class="waiting-data">Esperando datos...</p>
+                  </ng-template>
+                </div>
+                
+                <!-- ⭐️ Icono a la derecha (solo si hay distancia y está debajo del umbral) -->
+                <div class="icon_class_right"
+                      *ngIf="(distanceRight$ | async) !== null && (distanceRight$ | async)! < thresholdCm">
+                  <ion-icon 
+                      [src]="'assets/icon/spray_dcha_transp.svg'" 
+                      class="sensor-icon">
+                  </ion-icon>
+                </div>
+            </div>
+
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+          <ion-card-header>
+            <ion-card-subtitle class="subtitle-style">Tiempo total de apertura</ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content>
+            <h2 class="distance-value">
+              {{ formattedTimeRight$ | async }}
+            </h2>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card>
+          <ion-card-header>
+            <ion-card-subtitle class="subtitle-style">Número de detecciones</ion-card-subtitle>
+          </ion-card-header>
+
+          <ion-card-content>
+            <h2 class="distance-value">
+              {{ detectionCountRight$ | async }}
+            </h2>
+          </ion-card-content>
+        </ion-card>
+
+      </div>
+    </div>
+  </div>
+  
+  <div class="action-buttons ion-padding-top">
+    <ion-button
+      expand="block"
+      color="medium"
+      (click)="resetCounters()"
+      size="large">
+      <ion-icon slot="start" name="refresh-outline"></ion-icon>
+      Resetear Contadores
+    </ion-button>
+  </div>
+
+</ion-content>

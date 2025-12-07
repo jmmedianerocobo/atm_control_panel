@@ -1,0 +1,433 @@
+/* ======================================= */
+/* 🎨 Paleta y Estilos Generales */
+/* ======================================= */
+
+ion-content {
+  --ion-background-color: #e0e7ee !important; 
+  color: #34495e;
+}
+
+ion-toolbar {
+  --background: #ffffff !important; 
+  color: #34495e; 
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); 
+}
+
+ion-title {
+  color: #00b894 !important;
+  font-weight: 700;
+}
+
+/* ======================================= */
+/* Título de Columna con Toggles */
+/* ======================================= */
+
+.column-title {
+  font-size: 1.8em; 
+  font-weight: 700; 
+  color: #34495e; 
+  margin-top: 15px;
+  margin-bottom: 25px;
+  border-bottom: 3px solid #00b894; 
+  padding-bottom: 8px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; 
+  padding-left: 10px; 
+  padding-right: 10px; 
+
+  span {
+    flex-grow: 1; 
+    text-align: center;
+  }
+  
+  @media (max-width: 896px) and (orientation: landscape) {
+    font-size: 1.4em; 
+    margin-bottom: 15px;
+  }
+
+  &.toggle-left {
+    ion-toggle { order: 1; }
+    span { order: 2; }
+  }
+
+  &.toggle-right {
+    span { order: 1; }
+    ion-toggle { order: 2; }
+  }
+}
+
+/* ======================================= */
+/* Tarjetas (Cards) */
+/* ======================================= */
+
+ion-card {
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15); 
+  border-radius: 12px;
+  --background: #ffffff; 
+  color: #34495e; 
+  margin-bottom: 20px;
+  border: 1px solid #dcdcdc; 
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  transition: box-shadow 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.subtitle-style {
+  font-size: 1.05em !important;
+  font-weight: 500;
+  color: #7f8c8d;
+}
+
+/* ======================================= */
+/* Estructura de Columnas (Responsivo) */
+/* ======================================= */
+
+.two-column-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px; 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  flex-grow: 1; 
+  align-content: stretch;
+
+  .column {
+    flex: 1;
+    min-width: 320px;
+    display: flex;
+    flex-direction: column;
+    
+    @media (max-width: 768px) {
+      flex: 1 1 100%;
+    }
+    
+    @media (max-width: 896px) and (orientation: landscape) {
+      flex: 1 1 45%; 
+      min-width: 0; 
+    }
+  }
+}
+
+/* ======================================= */
+/* Display de Distancia con Iconos */
+/* ======================================= */
+
+.distance-display {
+  text-align: center; 
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+  min-height: 120px;
+  position: relative;
+}
+
+.distance-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%; 
+  margin: 0;
+  padding: 0;
+  position: relative;
+  
+  @media (max-width: 896px) and (orientation: landscape) {
+    gap: 15px;
+  }
+}
+
+/* Icono del sensor (SVG) */
+.sensor-icon {
+  font-size: 4rem;
+  width: 4rem;
+  height: 4rem;
+  flex-shrink: 0;
+  
+  @media (max-width: 896px) and (orientation: landscape) {
+    font-size: 3rem;
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+/* Contenedor circular del icono en columna IZQUIERDA */
+.icon_class {
+  width: 80px;
+  height: 80px; 
+  background-color: #28a745;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  
+  position: absolute;
+  left: 20px; /* Empuja al extremo izquierdo */
+  top: 50%;
+  transform: translateY(-50%); /* Solo centrado vertical */
+  
+  animation: fadeInScale 0.4s ease-in-out;
+  
+  @media (max-width: 896px) and (orientation: landscape) {
+    width: 60px;
+    height: 60px;
+    left: 15px;
+  }
+  
+  ion-icon {
+    color: white !important; 
+    font-size: 2.5rem !important;
+  }
+}
+
+/* Contenedor circular del icono en columna DERECHA */
+.icon_class_right {
+  width: 80px;
+  height: 80px; 
+  background-color: #28a745;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  
+  position: absolute;
+  right: 20px; /* Empuja al extremo derecho */
+  top: 50%;
+  transform: translateY(-50%); /* Solo centrado vertical */
+  
+  animation: fadeInScaleRight 0.4s ease-in-out;
+  
+  @media (max-width: 896px) and (orientation: landscape) {
+    width: 60px;
+    height: 60px;
+    right: 15px;
+  }
+  
+  ion-icon {
+    color: white !important; 
+    font-size: 2.5rem !important;
+  }
+}
+
+/* Contenedor de texto - centrado en el contenedor */
+.text_class {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+@keyframes fadeInScaleRight {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+/* ======================================= */
+/* Valores de Distancia y Tiempo */
+/* ======================================= */
+
+.distance-value {
+  font-size: 4.5rem; 
+  font-weight: 900; 
+  color: #0978e0;
+  margin: 0;
+  padding: 0;
+  letter-spacing: -1px; 
+  line-height: 1;
+  transition: color 0.3s ease;
+
+  &.warning {
+    color: rgb(28, 146, 28);
+  }
+
+  @media (max-width: 896px) and (orientation: landscape) {
+    font-size: 3rem;
+  }
+  
+  span {
+    font-size: 0.4em; 
+    font-weight: 500;
+    color: #7f8c8d; 
+    vertical-align: super; 
+    margin-left: 5px;
+  }
+}
+
+/* ======================================= */
+/* Textos y Estados */
+/* ======================================= */
+
+.waiting-data {
+  color: #7f8c8d;
+  font-size: 1.2em;
+  font-style: italic;
+  margin: 0;
+  padding: 20px 0;
+  text-align: center;
+}
+
+ion-card-content p {
+  color: #7f8c8d;
+  font-size: 1em;
+  margin: 10px 0;
+}
+
+ion-note {
+  font-size: 0.95em;
+  font-weight: 600;
+  margin-top: 10px;
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ======================================= */
+/* Botones */
+/* ======================================= */
+
+.action-buttons {
+  max-width: 600px;
+  margin: 40px auto 20px; 
+  padding: 0 10px;
+  
+  @media (max-width: 896px) and (orientation: landscape) {
+    margin: 20px auto 10px;
+  }
+}
+
+ion-button {
+  transition: all 0.3s ease;
+}
+
+ion-button[color="primary"] {
+  --background: #00b894;
+  --color: white;
+  --box-shadow: 0 6px 15px rgba(0, 184, 148, 0.4); 
+  font-weight: bold;
+  height: 50px; 
+  font-size: 1.1em;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  
+  &:hover:not([disabled]) {
+    --background: #019874;
+    transform: translateY(-2px);
+  }
+  
+  &:active:not([disabled]) {
+    transform: translateY(0);
+  }
+  
+  &[disabled] {
+    opacity: 0.5;
+  }
+}
+
+ion-button[color="medium"] {
+  --background: #ffffff; 
+  --color: #00b894; 
+  --border-color: #00b894; 
+  border: 2px solid #00b894; 
+  font-weight: 600;
+  height: 50px;
+  font-size: 1.1em;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  
+  &:hover {
+    --background: #f0f9f7;
+    transform: translateY(-2px);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+ion-button[color="secondary"] {
+  --color: #00b894;
+  --background: transparent;
+  --border-color: #00b894;
+  font-weight: 500;
+  border-radius: 20px;
+  padding: 0 12px;
+  height: 36px;
+}
+
+ion-button ion-icon {
+  font-size: 1.3em;
+  margin-right: 8px;
+}
+
+/* ======================================= */
+/* Chips de Estado */
+/* ======================================= */
+
+ion-chip {
+  transition: all 0.3s ease;
+}
+
+ion-chip[color="success"] {
+  --background: #00b894;
+  --color: white;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 20px;
+}
+
+ion-chip[color="danger"] {
+  --background: #ff7675;
+  --color: white;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 20px;
+}
+
+/* ======================================= */
+/* Interruptores (Toggles) */
+/* ======================================= */
+
+ion-toggle {
+  --handle-background: white; 
+  --handle-background-checked: white;
+  --background: #aebacd; 
+  --background-checked: #00b894; 
+  --handle-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); 
+  padding: 5px;
+  transition: all 0.2s ease;
+  
+  @media (max-width: 896px) and (orientation: landscape) {
+    transform: scale(0.9);
+  }
+}
