@@ -37,6 +37,10 @@ export class DistanceViewPage {
   isConnected$ = this.bt.isConnected$;
   thresholdCm$ = this.bt.thresholdCm$;
 
+  litersPerMin:number = 0;
+  numApplicators:number = 0;
+
+
   // ==== Toggles visuales ====
   toggleLeftActive = true;
   toggleRightActive = true;
@@ -116,6 +120,17 @@ export class DistanceViewPage {
         }
       }
     });
+
+    this.bt.litersPerMin$.subscribe(v => {
+  this.litersPerMin = v;
+  this.updateFlow(); // recalcula FLOW_LPS
+});
+
+this.bt.numApplicators$.subscribe(v => {
+  this.numApplicators = v;
+  this.updateFlow();
+});
+
   }
 
   ionViewWillLeave() {
@@ -129,28 +144,31 @@ export class DistanceViewPage {
   // TIMER DE SEGUNDOS PARA TIEMPO DE APERTURA Y LITROS
   // ============================================================
   private startTimer() {
-    if (this.timer) return;
+  if (this.timer) return;
 
-    this.timer = setInterval(() => {
-      const th = this.bt.thresholdCm$.value;
+  this.timer = setInterval(() => {
+    const th = this.bt.thresholdCm$.value;
 
-      const distL = this.bt.distanceLeft$.value;
-      const distR = this.bt.distanceRight$.value;
+    const distL = this.bt.distanceLeft$.value;
+    const distR = this.bt.distanceRight$.value;
 
-      // LADO IZQUIERDO
-      if (distL !== null && distL < th) {
-        this.timeOpenLeft++;
-        this.litersLeft = this.timeOpenLeft * this.FLOW_LPS;
-      }
+    // 🔥 Caudal por lado (L/s)
+    const flowPerSideLPS = (this.litersPerMin * (this.numApplicators / 2)) / 60;
 
-      // LADO DERECHO
-      if (distR !== null && distR < th) {
-        this.timeOpenRight++;
-        this.litersRight = this.timeOpenRight * this.FLOW_LPS;
-      }
+    // --- LADO IZQUIERDO ---
+    if (distL !== null && distL < th) {
+      this.timeOpenLeft++;
+      this.litersLeft = this.timeOpenLeft * flowPerSideLPS;
+    }
 
-    }, 1000);
-  }
+    // --- LADO DERECHO ---
+    if (distR !== null && distR < th) {
+      this.timeOpenRight++;
+      this.litersRight = this.timeOpenRight * flowPerSideLPS;
+    }
+
+  }, 1000);
+}
 
   // ============================================================
   // RESET
@@ -168,6 +186,13 @@ export class DistanceViewPage {
     this.wasBelowLeft = false;
     this.wasBelowRight = false;
   }
+
+  private updateFlow() {
+  // litros por segundo = (litros/min * aplicadores) / 60
+  this.FLOW_LPS = (this.litersPerMin * this.numApplicators) / 60;
+  console.log('Nuevo FLOW_LPS =', this.FLOW_LPS);
+}
+
 
   // ============================================================
   // NAVEGACIÓN

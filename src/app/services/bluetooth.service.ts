@@ -36,6 +36,12 @@ export class BluetoothService {
   public holdTimeMs$ = new BehaviorSubject<number>(300);
   public maxValidDistanceCm$ = new BehaviorSubject<number>(250);
 
+  public retardoEntradaDist$ = new BehaviorSubject<number>(200);
+  public retardoSalidaDist$ = new BehaviorSubject<number>(250);
+  public litersPerMin$ = new BehaviorSubject<number>(10);
+  public numApplicators$ = new BehaviorSubject<number>(2);
+
+
   public pairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);
   public unpairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);
 
@@ -331,6 +337,23 @@ export class BluetoothService {
     this.maxValidDistanceCm$.next(v);
     return this.sendCommand('SET_MAX_DISTANCE', { value: v });
   }
-}
 
+  setRetardoEntradaDist(v: number) {
+  this.retardoEntradaDist$.next(v);
+  }
+
+  setRetardoSalidaDist(v: number) {
+    this.retardoSalidaDist$.next(v);
+  }
+
+  setLitersPerMin(v: number) {
+    this.litersPerMin$.next(v);
+  }
+
+  setNumApplicators(v: number) {
+    this.numApplicators$.next(v);
+  }
+
+
+}
 

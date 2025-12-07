@@ -1,14 +1,15 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
+import { FormsModule } from '@angular/forms';
+
+import {     
   IonHeader, IonToolbar, IonTitle,
   IonButtons, IonBackButton,
   IonContent, IonList, IonItem,
   IonLabel, IonNote, IonButton,
-  IonToggle
+  IonToggle, IonIcon
 } from '@ionic/angular/standalone';
 
-import { PickerController } from '@ionic/angular';
 import { BluetoothService } from '../services/bluetooth.service';
 
 @Component({
@@ -18,181 +19,86 @@ import { BluetoothService } from '../services/bluetooth.service';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     IonHeader, IonToolbar, IonTitle,
     IonButtons, IonBackButton,
     IonContent, IonList, IonItem,
     IonLabel, IonNote, IonButton,
-    IonToggle
+    IonToggle, IonIcon
   ]
 })
 export class AutoConfigPage {
 
+  /* ================================
+      VALORES PRINCIPALES
+  ================================= */
+  mode: 0 | 1 = 0;
+
+  // MODO DISTANCIA
+  retardoEntradaDist = 200;
+  retardoSalidaDist = 250;
+  litersPerMin = 10;
+  numApplicators = 2;
+
+  // MODO TEMPORIZADO
+  retardoEntradaTemp = 200;
+  activeTimeMs = 300;
+
+  // LECTURA
   thresholdCm = 0;
   hysteresisCm = 0;
   holdTimeMs = 0;
-  activeTimeMs = 0;
-  mode: 0 | 1 = 0;
 
-  litersPerMin = 10;        // NUEVO
-  numApplicators = 2;       // NUEVO
-
-  constructor(
-    private pickerCtrl: PickerController,
-    private bt: BluetoothService
-  ) {}
+  constructor(public bt: BluetoothService) {}
 
   ionViewWillEnter() {
     this.thresholdCm   = this.bt.thresholdCm$.value;
     this.hysteresisCm  = this.bt.hysteresisCm$.value;
     this.holdTimeMs    = this.bt.holdTimeMs$.value;
-
-    // valores por defecto configurables
-    this.activeTimeMs  = 300;
-    this.mode          = 0;
-
-    // valores nuevos
-    this.litersPerMin  = 10;
-    this.numApplicators = 2;
   }
 
-  // =====================================================
-  //        TOGGLE MODO (0 ↔ 1)
-  // =====================================================
+  /* ================================
+      STEPPER GENÉRICO
+  ================================= */
+  step(param: string, amount: number) {
+    (this as any)[param] = Math.max(
+      0,
+      (this as any)[param] + amount
+    );
+  }
+
+  /* ================================
+      TOGGLE MODO
+  ================================= */
   toggleMode(ev: any) {
-    const checked = ev.detail.checked;
-    this.mode = checked ? 1 : 0;
-
-    console.log("[AUTO] Modo cambiado a", this.mode);
-
-    // enviar al Arduino
+    this.mode = ev.detail.checked ? 1 : 0;
     this.bt.setMode(this.mode);
   }
 
-  // =====================================================
-  //        PICKER (paso 25)
-  // =====================================================
-  async openPicker(type: string) {
-    let columns: any[] = [];
-
-    switch (type) {
-
-      case 'threshold':
-        columns = [{
-          name: 'value',
-          options: Array.from({ length: 9 }, (_, i) => {
-            const v = i * 25;
-            return { text: `${v} cm`, value: v };
-          })
-        }];
-        break;
-
-      case 'hysteresis':
-        columns = [{
-          name: 'value',
-          options: Array.from({ length: 5 }, (_, i) => {
-            const v = i * 25;
-            return { text: `${v} cm`, value: v };
-          })
-        }];
-        break;
-
-      case 'hold':
-        columns = [{
-          name: 'value',
-          options: Array.from({ length: 41 }, (_, i) => {
-            const v = i * 25;
-            return { text: `${v} ms`, value: v };
-          })
-        }];
-        break;
-
-      case 'active':
-        columns = [{
-          name: 'value',
-          options: Array.from({ length: 81 }, (_, i) => {
-            const v = i * 25;
-            return { text: `${v} ms`, value: v };
-          })
-        }];
-        break;
-
-      case 'liters':  // NUEVO
-        columns = [{
-          name: 'value',
-          options: Array.from({ length: 40 }, (_, i) => {
-            const v = (i + 1); // 1–40 L/min
-            return { text: `${v} L/min`, value: v };
-          })
-        }];
-        break;
-
-      case 'applicators':  // NUEVO
-        columns = [{
-          name: 'value',
-          options: Array.from({ length: 20 }, (_, i) => {
-            const v = i + 1; // 1–20 aplicadores
-            return { text: `${v}`, value: v };
-          })
-        }];
-        break;
-    }
-
-    const picker = await this.pickerCtrl.create({
-      columns,
-      buttons: [
-        { text: "Cancelar", role: "cancel" },
-        {
-          text: "Aceptar",
-          handler: (value) => {
-            const val = Number(value?.value?.value ?? 0);
-
-            switch (type) {
-              case 'threshold':
-                this.thresholdCm = val;
-                if (this.mode === 0) {
-                  this.bt.setThresholdCm(this.thresholdCm);
-                }
-                break;
-
-              case 'hysteresis':
-                this.hysteresisCm = val;
-                break;
-
-              case 'hold':
-                this.holdTimeMs = val;
-                break;
-
-              case 'active':
-                this.activeTimeMs = val;
-                break;
-
-              case 'liters':   // NUEVO
-                this.litersPerMin = val;
-                break;
-
-              case 'applicators': // NUEVO
-                this.numApplicators = val;
-                break;
-            }
-          }
-        }
-      ]
-    });
-
-    await picker.present();
-  }
-
-  // =====================================================
-  //        APLICAR CONFIGURACIÓN
-  // =====================================================
+  /* ================================
+      GUARDAR CONFIGURACIÓN
+  ================================= */
   applyConfig() {
+
+    // valores comunes
     this.bt.setThresholdCm(this.thresholdCm);
     this.bt.setHysteresisCm(this.hysteresisCm);
     this.bt.setHoldTimeMs(this.holdTimeMs);
-    this.bt.setActiveTimeMs(this.activeTimeMs);
     this.bt.setMode(this.mode);
 
-    console.log("L/min =", this.litersPerMin);
+    this.bt.setRetardoEntradaDist(this.retardoEntradaDist);
+    this.bt.setRetardoSalidaDist(this.retardoSalidaDist);
+    this.bt.setLitersPerMin(this.litersPerMin);
+    this.bt.setNumApplicators(this.numApplicators);
+
+
+    console.log("=== CONFIGURACIÓN ENVIADA ===");
+    console.log("Retardo entrada (dist) =", this.retardoEntradaDist);
+    console.log("Retardo salida (dist)  =", this.retardoSalidaDist);
+    console.log("Litros/min =", this.litersPerMin);
     console.log("Aplicadores =", this.numApplicators);
+    console.log("Retardo entrada (temp) =", this.retardoEntradaTemp);
+    console.log("Temporizador apertura =", this.activeTimeMs);
   }
+
 }

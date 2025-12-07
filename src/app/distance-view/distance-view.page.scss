@@ -1,100 +1,116 @@
 ion-content {
   --ion-background-color: #e0f0f5 !important;
-  color: #34495e;
+  color: #2c3e50; /* 🔹 Texto principal elegante */
 }
 
-/* PANEL GENERAL */
+/* PANEL */
 .panel-container {
   background: white;
   border-radius: 18px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
   border: 1px solid #d0d0d0;
 }
 
-/* HEADER DE CADA LADO */
+/* HEADER */
 .panel-header {
-  background: #ffffff;
   padding: 12px 0;
   text-align: center;
   font-size: 1.4rem;
   font-weight: 700;
   border-bottom: 3px solid #00b894;
-  color: blue;
+  background: #fff;
+  color: #1f3a93; /* 🔹 Azul elegante */
 }
 
 /* BODY */
 .panel-body {
   background: #8ef2f0;
   padding: 25px 15px;
-  text-align: center;
 }
 
-/* COLORES DINÁMICOS (funcionan con [ngClass]) */
-.bg-success {
-  background-color: #28a745 !important;
-}
-
-.bg-danger {
-  background-color: #e74c3c !important;
-}
-
-/* ICONO SPRAY */
-.spray-icon {
-  width: 140px;
-  height: 140px;
-  background: white;
-  border-radius: 12px;
-  margin: 0 auto 16px auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.25);
-}
-
-.spray-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: transparent; /* Antes tenía un error */
-}
-
-/* BLOQUES DE INFO */
+/* INFO BLOCK */
 .info-block {
-  background: #ffffff;
+  background: #ffffff !important;
   border-radius: 12px;
+  border: 1px solid #dcdcdc;
   padding: 12px 18px;
+  min-height: 95px;
   margin-bottom: 14px;
   text-align: left;
-  border: 1px solid #dcdcdc;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: background-color 0.25s, border-color 0.25s;
+  color: #2c3e50; /* 🔹 Siempre texto oscuro */
 }
 
+/* Fondo verde cuando activo */
+.info-block.active-spray {
+  background-color: #b6f7c1 !important;
+  border-color: #28a745 !important;
+  color: #1e3d24 !important; /* 🔹 Texto más oscuro para fondo verde */
+}
+
+.info-block.inactive-spray {
+  background-color: #ffffff !important;
+}
+
+/* Labels */
 .info-block label {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #34495e;
+  color: #34495e; /* 🔹 Gris profesional */
 }
 
-.info-block .value {
-  font-size: 1.5rem;
+/* DISTANCE ROW */
+.distance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* Valor distancia */
+.distance-value {
+  font-size: 1.6rem;
   font-weight: 700;
-  color: #333;
-  margin-top: 4px;
+  color: #2c3e50; /* 🔹 Elegante y bien visible */
 }
 
-/* ESTADO */
-.status-line {
+/* ICONO SPRAY MINI */
+.spray-icon-mini {
+  width: 55px;
+  height: 55px;
+  background: #ffffff;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 6px;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color:black;
+  justify-content: center;
+  padding: 6px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+  transition: background-color 0.25s, transform 0.25s, opacity 0.25s ease;
 }
 
-/* LAYOUT */
+/* Icono cuando activo */
+.spray-icon-mini.active {
+  background: #27ae60 !important; /* 🔹 Verde elegante más oscuro */
+  border: 2px solid #1e874b;
+  transform: scale(1.05);
+  opacity: 1;
+}
+
+.spray-icon-mini.hidden {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.spray-icon-mini img {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+
+/* COLUMNAS */
 .two-column-container {
   display: flex;
   gap: 20px;
@@ -106,58 +122,16 @@ ion-content {
   min-width: 350px;
 }
 
-/* TOTAL LITROS */
+/* TOTAL PANEL */
 .total-panel {
   background: white;
   padding: 18px;
   margin-top: 25px;
   border-radius: 14px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
-  text-align: center;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
   font-size: 1.6rem;
   display: flex;
   justify-content: space-between;
-  font-weight: 700;
-  color: #333;
-}
-
-/* ==== DISTANCE ROW: icono izquierda + valor derecha ==== */
-.distance-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 10px;
-}
-
-/* Icono reducido */
-.spray-icon-mini {
-  width: 70px;
-  height: 70px;
-  background: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  box-shadow: 0 3px 7px rgba(0,0,0,0.25);
-}
-
-/* Si no debe mostrarse → mantiene hueco sin ser visible */
-.spray-icon-mini.hidden {
-  visibility: hidden;
-}
-
-.spray-icon-mini img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* Distancia a la derecha */
-.distance-value {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #000;
-  margin-left: 10px;
+  color: #2c3e50; /* 🔹 Texto oscuro elegante */
 }
 

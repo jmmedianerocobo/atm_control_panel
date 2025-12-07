@@ -7,12 +7,10 @@
     </ion-buttons>
 
     <ion-buttons slot="end">
-      <!-- Configuración -->
       <ion-button (click)="openConfigPage()" fill="clear">
         <ion-icon src="/assets/icon/settings-outline.svg"></ion-icon>
       </ion-button>
 
-      <!-- Ajustes BT -->
       <ion-button
         (click)="goToBluetoothSettings()"
         color="secondary"
@@ -28,8 +26,10 @@
         </ion-label>
       </ion-chip>
     </ion-buttons>
+
   </ion-toolbar>
 </ion-header>
+
 
 <ion-content class="ion-padding">
 
@@ -44,43 +44,36 @@
 
       <div class="panel-body">
 
-        
-
         <!-- Estado -->
-        <div class="info-block">
-  <label>Distancia</label>
+ <div class="info-block"
+             [ngClass]="{
+               'active-spray': (distanceLeft$ | async)! < (thresholdCm$ | async)!,
+               'inactive-spray': (distanceLeft$ | async)! >= (thresholdCm$ | async)!
+             }">
 
-  <div class="distance-row">
+          <label>Distancia</label>
 
-    <!-- ICONO a la izquierda -->
-    <ng-container *ngIf="(distanceLeft$ | async) as distLeft; else noIcon">
-      <div 
-        class="spray-icon-mini bg-success"
-        *ngIf="distLeft < (thresholdCm$ | async)!">
-        <img src="assets/icon/spray_izda_transp.svg" />
-      </div>
+          <div class="distance-row">
 
-      <!-- Si NO se debe mostrar, se deja hueco -->
-      <div *ngIf="distLeft >= (thresholdCm$ | async)!" class="spray-icon-mini hidden"></div>
-    </ng-container>
+            <!-- Valor izquierda -->
+            <div class="distance-value">
+              <ng-container *ngIf="distanceLeft$ | async as distLeft; else noRight">
+                {{ distLeft }} cm
+              </ng-container>
+              <ng-template #noLeft>--</ng-template>
+            </div>
 
-    <!-- Si no hay datos -->
-    <ng-template #noIcon>
-      <div class="spray-icon-mini hidden"></div>
-    </ng-template>
+            <!-- Icono derecha -->
+            <div class="spray-icon-mini"
+                 [ngClass]="{
+                    'active': (distanceLeft$ | async)! < (thresholdCm$ | async)!,
+                    'hidden': (distanceLeft$ | async)! >= (thresholdCm$ | async)!
+                 }">
+              <img src="assets/icon/spray_izda_transp.svg" />
+            </div>
 
-    <!-- VALOR a la derecha -->
-    <div class="distance-value">
-      <ng-container *ngIf="distanceLeft$ | async as distLeft; else noLeft">
-       <h1> {{ distLeft }} cm</h1>
-      </ng-container>
-
-      <ng-template #noLeft>- - -</ng-template>
-    </div>
-
-  </div>
-</div>
-
+          </div>
+        </div>
 
         <!-- Tiempo apertura -->
         <div class="info-block">
@@ -99,6 +92,7 @@
           <label>Litros Aplicados lado Izquierdo</label>
           <div class="value">{{ litersLeft | number:'1.2-2' }}</div>
         </div>
+
       </div>
     </div>
 
@@ -111,57 +105,47 @@
 
       <div class="panel-body">
 
-        
-
         <!-- Estado -->
-        <div class="info-block">
-  <label>Distancia</label>
+        <div class="info-block"
+             [ngClass]="{
+               'active-spray': (distanceRight$ | async)! < (thresholdCm$ | async)!,
+               'inactive-spray': (distanceRight$ | async)! >= (thresholdCm$ | async)!
+             }">
 
-  <div class="distance-row">
+          <label>Distancia</label>
 
-    <!-- 🔹 DISTANCIA A LA IZQUIERDA -->
-    <div class="distance-value">
-      <ng-container *ngIf="distanceRight$ | async as distRight; else noRight">
-        {{ distRight }} cm
-      </ng-container>
-      <ng-template #noRight>- - -</ng-template>
-    </div>
+          <div class="distance-row">
 
-    <!-- 🔹 ICONO A LA DERECHA -->
-    <ng-container *ngIf="(distanceRight$ | async) as distRight; else noIcon">
-      
-      <!-- Icono visible si está por debajo del umbral -->
-      <div 
-        class="spray-icon-mini bg-success"
-        *ngIf="distRight < (thresholdCm$ | async)!">
-        <img src="assets/icon/spray_dcha_transp.svg" />
-      </div>
+            <!-- Valor izquierda -->
+            <div class="distance-value">
+              <ng-container *ngIf="distanceRight$ | async as distRight; else noRight">
+                {{ distRight }} cm
+              </ng-container>
+              <ng-template #noRight>--</ng-template>
+            </div>
 
-      <!-- Si NO debe mostrarse: se reserva el hueco -->
-      <div *ngIf="distRight >= (thresholdCm$ | async)!" class="spray-icon-mini hidden"></div>
+            <!-- Icono derecha -->
+            <div class="spray-icon-mini"
+                 [ngClass]="{
+                    'active': (distanceRight$ | async)! < (thresholdCm$ | async)!,
+                    'hidden': (distanceRight$ | async)! >= (thresholdCm$ | async)!
+                 }">
+              <img src="assets/icon/spray_dcha_transp.svg" />
+            </div>
 
-    </ng-container>
+          </div>
+        </div>
 
-    <ng-template #noIcon>
-      <div class="spray-icon-mini hidden"></div>
-    </ng-template>
-
-  </div>
-</div>
-
-        <!-- Tiempo apertura -->
         <div class="info-block">
           <label>Tiempo en Apertura</label>
           <div class="value">{{ timeOpenRight | number:'1.2-2' }} s</div>
         </div>
 
-        <!-- Número aperturas -->
         <div class="info-block">
           <label>Número de Aperturas</label>
           <div class="value">{{ openCountRight }}</div>
         </div>
 
-        <!-- Litros -->
         <div class="info-block">
           <label>Litros Aplicados lado Derecho</label>
           <div class="value">{{ litersRight | number:'1.2-2' }}</div>
@@ -177,6 +161,3 @@
   </div>
 
 </ion-content>
-
-
-
