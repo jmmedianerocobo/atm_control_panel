@@ -7,24 +7,29 @@
     </ion-buttons>
 
     <ion-buttons slot="end">
+
+      <!-- Configuración -->
       <ion-button (click)="openConfigPage()" fill="clear">
         <ion-icon src="/assets/icon/settings-outline.svg"></ion-icon>
       </ion-button>
 
-      <ion-button
-        (click)="goToBluetoothSettings()"
-        color="secondary"
-        fill="outline"
-        size="small"
-      >
-        Ajustes BT
+      <!-- Bluetooth -->
+      <ion-button (click)="goToBluetoothSettings()" color="primary" fill="clear">
+        <ion-icon src="/assets/icon/bluetooth-outline.svg" class="bt-icon"></ion-icon>
       </ion-button>
 
+      <!-- 🔥 Botón SALIR APP -->
+      <ion-button (click)="exitApp()" fill="clear" color="danger">
+        <ion-icon src="/assets/icon/power-outline.svg"></ion-icon>
+      </ion-button>
+
+      <!-- Estado conexión -->
       <ion-chip [color]="(isConnected$ | async) ? 'success' : 'danger'">
         <ion-label>
           {{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}
         </ion-label>
       </ion-chip>
+
     </ion-buttons>
 
   </ion-toolbar>
@@ -155,9 +160,22 @@
     </div>
   </div>
 
+ <div class="total-container">
+
+  <!-- Columna izquierda -->
   <div class="total-panel">
     <span>Total Litros Aplicados</span>
     <strong>{{ (litersLeft + litersRight) | number:'1.2-2' }}</strong>
   </div>
+
+  <!-- Columna derecha: botón reset -->
+  <div class="reset-panel">
+    <ion-button color="danger" fill="solid" (click)="resetStats()">
+      Reset Contadores
+    </ion-button>
+  </div>
+
+</div>
+
 
 </ion-content>

@@ -52,10 +52,25 @@ export class AutoConfigPage {
   constructor(public bt: BluetoothService) {}
 
   ionViewWillEnter() {
-    this.thresholdCm   = this.bt.thresholdCm$.value;
-    this.hysteresisCm  = this.bt.hysteresisCm$.value;
-    this.holdTimeMs    = this.bt.holdTimeMs$.value;
-  }
+  // Valores modo distancia
+  this.retardoEntradaDist = this.bt.retardoEntradaDist$.value;
+  this.retardoSalidaDist  = this.bt.retardoSalidaDist$.value;
+  this.litersPerMin       = this.bt.litersPerMin$.value;
+  this.numApplicators     = this.bt.numApplicators$.value;
+
+  // Valores modo temporizado
+  this.retardoEntradaTemp = this.bt.retardoEntradaDist$.value; // o el valor correcto si existe otro
+  this.activeTimeMs       = this.bt.holdTimeMs$.value;         // mismo caso: reemplázalo si tienes otro campo
+
+  // Parámetros lectura
+  this.thresholdCm   = this.bt.thresholdCm$.value;
+  this.hysteresisCm  = this.bt.hysteresisCm$.value;
+  this.holdTimeMs    = this.bt.holdTimeMs$.value;
+
+  // Modo actual
+  this.mode = this.bt.mode$.value ?? 0;
+}
+
 
   /* ================================
       STEPPER GENÉRICO

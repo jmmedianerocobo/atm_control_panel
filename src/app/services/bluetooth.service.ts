@@ -41,6 +41,8 @@ export class BluetoothService {
   public litersPerMin$ = new BehaviorSubject<number>(10);
   public numApplicators$ = new BehaviorSubject<number>(2);
 
+  public mode$ = new BehaviorSubject<0 | 1>(0);
+
 
   public pairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);
   public unpairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);

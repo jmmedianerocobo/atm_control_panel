@@ -11,6 +11,19 @@ ion-content {
   border: 1px solid #d0d0d0;
 }
 
+.btn-blue {
+  --color: #007bff;     /* azul estilo Bootstrap */
+  --border-color: #007bff;
+}
+
+.bt-icon {
+  width: 24px;
+  height: 24px;
+  filter: invert(30%) sepia(90%) saturate(500%) hue-rotate(180deg);
+}
+
+
+
 /* HEADER */
 .panel-header {
   padding: 12px 0;
@@ -134,4 +147,34 @@ ion-content {
   justify-content: space-between;
   color: #2c3e50; /* 🔹 Texto oscuro elegante */
 }
+
+/* Contenedor general de 2 columnas */
+.total-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 25px;
+  gap: 20px;
+}
+
+/* Panel de totales */
+.total-panel {
+  flex: 1;
+  background: white;
+  padding: 18px;
+  border-radius: 14px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  font-size: 1.6rem;
+  color: #2c3e50;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Panel del botón */
+.reset-panel {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { BluetoothService } from '../services/bluetooth.service';
+import { App } from '@capacitor/app';
 
 import { CommonModule, AsyncPipe, DecimalPipe } from '@angular/common';
 import {
@@ -173,7 +174,7 @@ this.bt.numApplicators$.subscribe(v => {
   // ============================================================
   // RESET
   // ============================================================
-  private resetStats() {
+  public resetStats() {
     this.timeOpenLeft = 0;
     this.timeOpenRight = 0;
 
@@ -204,5 +205,10 @@ this.bt.numApplicators$.subscribe(v => {
   openConfigPage() {
     this.router.navigate(['/auto-config']);
   }
+
+  exitApp(){
+    App.exitApp();
+  }
+  
 }
 
