@@ -7,7 +7,7 @@ import {
   IonHeader, IonToolbar, IonTitle,
   IonContent, IonButtons, IonBackButton,
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonButton, IonLabel, IonItem, IonList, IonChip, IonSpinner
+  IonButton, IonLabel, IonItem, IonList, IonChip, IonSpinner, IonIcon
 } from '@ionic/angular/standalone';
 
 @Component({
@@ -20,12 +20,13 @@ import {
     IonHeader, IonToolbar, IonTitle,
     IonContent, IonButtons, IonBackButton,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-    IonButton, IonLabel, IonItem, IonList, IonChip, IonSpinner
+    IonButton, IonLabel, IonItem, IonList, IonChip, IonSpinner, IonIcon
   ]
 })
 export class BtSettingsPage implements OnInit, OnDestroy {
 
   isConnected$ = this.bt.isConnected$;
+  isConnecting = false;
 
   pairedDevices$ = this.bt.pairedDevices$;
   unpairedDevices$ = this.bt.unpairedDevices$;
@@ -50,6 +51,17 @@ export class BtSettingsPage implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     console.log('[BT-SETTINGS] destroy');
+  }
+
+  async toggleConnection() {
+    if (this.isConnected$.value) {
+      this.disconnect();
+      return;
+    }
+
+    this.isConnecting = true;
+    await this.scan();
+    this.isConnecting = false;
   }
 
   async connectTo(device: BluetoothDevice) {

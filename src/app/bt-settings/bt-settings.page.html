@@ -1,5 +1,5 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar color="dark">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/distance-view"></ion-back-button>
     </ion-buttons>
@@ -9,32 +9,51 @@
 
 <ion-content class="ion-padding">
 
-  <!-- ESTADO -->
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Conexión</ion-card-title>
-    </ion-card-header>
+  <!-- =======================
+       ESTADO PRINCIPAL
+  ========================== -->
+  <div class="status-card" 
+       [ngClass]="{
+         'state-disconnected': !(isConnected$ | async) && !isConnecting,
+         'state-connecting': isConnecting,
+         'state-connected': (isConnected$ | async)
+       }">
 
-    <ion-card-content>
+    <div class="status-icon">
+      <ion-icon name="bluetooth" *ngIf="!isConnecting"></ion-icon>
+      <ion-spinner *ngIf="isConnecting"></ion-spinner>
+    </div>
 
-      <ion-item>
-        <ion-label>Estado</ion-label>
+    <div class="status-text">
+      <h2 *ngIf="!(isConnected$ | async) && !isConnecting">Desconectado</h2>
+      <h2 *ngIf="isConnecting">Conectando…</h2>
+      <h2 *ngIf="isConnected$ | async">Conectado</h2>
+      <p>{{ (isConnected$ | async) ? 'El dispositivo está listo.' : 'Ningún dispositivo conectado.' }}</p>
+    </div>
 
-        <ion-chip color="success" *ngIf="isConnected$ | async">Conectado</ion-chip>
-        <ion-chip color="danger" *ngIf="!(isConnected$ | async)">Desconectado</ion-chip>
-      </ion-item>
+    <!-- BOTÓN ACCIÓN PRINCIPAL -->
+    <ion-button expand="block"
+                [color]="(isConnected$ | async) ? 'danger' : 'primary'"
+                (click)="toggleConnection()">
 
-      <ion-button expand="block" color="danger"
-                  *ngIf="isConnected$ | async"
-                  (click)="disconnect()">
+      <ng-container *ngIf="!(isConnected$ | async) && !isConnecting">
+        Buscar y Conectar
+      </ng-container>
+
+      <ng-container *ngIf="isConnecting">
+        Cancelar
+      </ng-container>
+
+      <ng-container *ngIf="isConnected$ | async">
         Desconectar
-      </ion-button>
+      </ng-container>
 
-    </ion-card-content>
-  </ion-card>
+    </ion-button>
+  </div>
 
-
-  <!-- EMPAREJADOS -->
+  <!-- =======================
+       DISPOSITIVOS EMPAREJADOS
+  ========================== -->
   <ion-card>
     <ion-card-header>
       <ion-card-title>Dispositivos emparejados</ion-card-title>
@@ -48,8 +67,8 @@
         </ion-label>
 
         <ion-button color="primary"
-                    (click)="connectTo(dev)"
-                    [disabled]="isConnected$ | async">
+                    [disabled]="isConnected$ | async"
+                    (click)="connectTo(dev)">
           Conectar
         </ion-button>
       </ion-item>
@@ -60,18 +79,17 @@
     </ion-list>
   </ion-card>
 
-
-  <!-- ESCANEO -->
+  <!-- =======================
+       BÚSQUEDA NUEVOS DISPOSITIVOS
+  ========================== -->
   <ion-card>
     <ion-card-header>
       <ion-card-title>Buscar nuevos dispositivos</ion-card-title>
     </ion-card-header>
 
     <ion-card-content>
-
       <ion-button expand="block" color="secondary"
-                  (click)="scan()"
-                  [disabled]="isScanning">
+                  (click)="scan()" [disabled]="isScanning">
         <span *ngIf="!isScanning">Buscar</span>
         <ion-spinner *ngIf="isScanning"></ion-spinner>
       </ion-button>
@@ -83,8 +101,7 @@
             <p>{{ dev.address }}</p>
           </ion-label>
 
-          <ion-button color="success"
-                      (click)="tryConnect(dev)">
+          <ion-button color="success" (click)="tryConnect(dev)">
             Emparejar + Conectar
           </ion-button>
         </ion-item>
@@ -93,62 +110,39 @@
       <ion-item *ngIf="(unpairedDevices$ | async)?.length === 0 && !isScanning">
         <ion-label>No se encontraron dispositivos nuevos.</ion-label>
       </ion-item>
-
     </ion-card-content>
   </ion-card>
 
-
-  <!-- INFO DE SENSORES -->
+  <!-- =======================
+       SENSORES
+  ========================== -->
   <ion-card>
     <ion-card-header>
       <ion-card-title>Sensores</ion-card-title>
     </ion-card-header>
 
     <ion-card-content>
-
       <ion-item>
         <ion-label>Izquierda</ion-label>
-        <ion-chip *ngIf="left$ | async as L" color="primary">{{ L }} cm</ion-chip>
-        <ion-chip *ngIf="!(left$ | async)" color="medium">N/A</ion-chip>
+        <ion-chip color="primary" *ngIf="left$ | async as L">{{ L }} cm</ion-chip>
+        <ion-chip color="medium" *ngIf="!(left$ | async)">N/A</ion-chip>
       </ion-item>
 
       <ion-item>
         <ion-label>Derecha</ion-label>
-        <ion-chip *ngIf="right$ | async as R" color="primary">{{ R }} cm</ion-chip>
-        <ion-chip *ngIf="!(right$ | async)" color="medium">N/A</ion-chip>
+        <ion-chip color="primary" *ngIf="right$ | async as R">{{ R }} cm</ion-chip>
+        <ion-chip color="medium" *ngIf="!(right$ | async)">N/A</ion-chip>
       </ion-item>
 
       <ion-button expand="block" color="medium"
                   [disabled]="!(isConnected$ | async)"
                   (click)="requestStatus()">
-        Solicitar STATUS
+        Actualizar estado
       </ion-button>
-
-    </ion-card-content>
-  </ion-card>
-
-
-  <!-- RELÉS -->
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Relés</ion-card-title>
-    </ion-card-header>
-
-    <ion-card-content>
-      <ion-item>
-        <ion-label>Izquierdo</ion-label>
-        <ion-chip color="success" *ngIf="relayLeft$ | async">ON</ion-chip>
-        <ion-chip color="danger" *ngIf="!(relayLeft$ | async)">OFF</ion-chip>
-      </ion-item>
-
-      <ion-item>
-        <ion-label>Derecho</ion-label>
-        <ion-chip color="success" *ngIf="relayRight$ | async">ON</ion-chip>
-        <ion-chip color="danger" *ngIf="!(relayRight$ | async)">OFF</ion-chip>
-      </ion-item>
     </ion-card-content>
   </ion-card>
 
 </ion-content>
+
 
 

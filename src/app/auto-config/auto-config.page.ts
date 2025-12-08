@@ -40,8 +40,7 @@ export class AutoConfigPage {
   litersPerMin = 10;
   numApplicators = 2;
 
-  // MODO TEMPORIZADO
-  retardoEntradaTemp = 200;
+  // MODO TEMPORIZADO (MODE 1)
   activeTimeMs = 300;
 
   // LECTURA
@@ -52,24 +51,24 @@ export class AutoConfigPage {
   constructor(public bt: BluetoothService) {}
 
   ionViewWillEnter() {
-  // Valores modo distancia
-  this.retardoEntradaDist = this.bt.retardoEntradaDist$.value;
-  this.retardoSalidaDist  = this.bt.retardoSalidaDist$.value;
-  this.litersPerMin       = this.bt.litersPerMin$.value;
-  this.numApplicators     = this.bt.numApplicators$.value;
 
-  // Valores modo temporizado
-  this.retardoEntradaTemp = this.bt.retardoEntradaDist$.value; // o el valor correcto si existe otro
-  this.activeTimeMs       = this.bt.holdTimeMs$.value;         // mismo caso: reemplázalo si tienes otro campo
+    // ------ Valores modo distancia
+    this.retardoEntradaDist = this.bt.retardoEntradaDist$.value;
+    this.retardoSalidaDist  = this.bt.retardoSalidaDist$.value;
+    this.litersPerMin       = this.bt.litersPerMin$.value;
+    this.numApplicators     = this.bt.numApplicators$.value;
 
-  // Parámetros lectura
-  this.thresholdCm   = this.bt.thresholdCm$.value;
-  this.hysteresisCm  = this.bt.hysteresisCm$.value;
-  this.holdTimeMs    = this.bt.holdTimeMs$.value;
+    // ------ Parámetros lectura
+    this.thresholdCm   = this.bt.thresholdCm$.value;
+    this.hysteresisCm  = this.bt.hysteresisCm$.value;
+    this.holdTimeMs    = this.bt.holdTimeMs$.value;
 
-  // Modo actual
-  this.mode = this.bt.mode$.value ?? 0;
-}
+    // ------ Modo temporizado (MODE 1)
+    this.activeTimeMs = this.bt.activeTimeMs$.value;
+
+    // ------ Modo actual
+    this.mode = this.bt.mode$.value ?? 0;
+  }
 
 
   /* ================================
@@ -95,25 +94,30 @@ export class AutoConfigPage {
   ================================= */
   applyConfig() {
 
-    // valores comunes
+    // parámetros comunes
     this.bt.setThresholdCm(this.thresholdCm);
     this.bt.setHysteresisCm(this.hysteresisCm);
     this.bt.setHoldTimeMs(this.holdTimeMs);
     this.bt.setMode(this.mode);
 
+    // modo distancia
     this.bt.setRetardoEntradaDist(this.retardoEntradaDist);
     this.bt.setRetardoSalidaDist(this.retardoSalidaDist);
     this.bt.setLitersPerMin(this.litersPerMin);
     this.bt.setNumApplicators(this.numApplicators);
 
+    // modo temporizado
+    if (this.mode === 1) {
+    this.bt.setActiveTimeMs(this.activeTimeMs);
+}
+
 
     console.log("=== CONFIGURACIÓN ENVIADA ===");
-    console.log("Retardo entrada (dist) =", this.retardoEntradaDist);
-    console.log("Retardo salida (dist)  =", this.retardoSalidaDist);
-    console.log("Litros/min =", this.litersPerMin);
-    console.log("Aplicadores =", this.numApplicators);
-    console.log("Retardo entrada (temp) =", this.retardoEntradaTemp);
-    console.log("Temporizador apertura =", this.activeTimeMs);
+    console.log("Modo =", this.mode);
+    console.log("Threshold =", this.thresholdCm);
+    console.log("Histeresis =", this.hysteresisCm);
+    console.log("Hold =", this.holdTimeMs);
+    console.log("ActiveTimeMs =", this.activeTimeMs);
   }
 
 }

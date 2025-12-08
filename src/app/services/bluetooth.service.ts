@@ -43,6 +43,8 @@ export class BluetoothService {
 
   public mode$ = new BehaviorSubject<0 | 1>(0);
 
+  public activeTimeMs$ = new BehaviorSubject<number>(2000);
+
 
   public pairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);
   public unpairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);
@@ -328,12 +330,16 @@ export class BluetoothService {
   }
 
   setActiveTimeMs(v: number) {
+    this.activeTimeMs$.next(v);
     return this.sendCommand('SET_ACTIVE_TIME', { value: v });
   }
 
+
   setMode(v: 0 | 1) {
-    return this.sendCommand('SET_MODE', { value: v });
-  }
+  this.mode$.next(v);
+  return this.sendCommand('SET_MODE', { value: v });
+}
+
 
   setMaxValidDistanceCm(v: number) {
     this.maxValidDistanceCm$.next(v);
