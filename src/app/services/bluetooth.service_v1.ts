@@ -76,6 +76,10 @@ export class BluetoothService {
   private configurableThresholdSubject = new BehaviorSubject<number>(this.DEFAULT_THRESHOLD);
   public configurableThreshold$ = this.configurableThresholdSubject.asObservable();
 
+  public retardoEntradaTemp$ = new BehaviorSubject<number>(0);     // retardo modo 1
+  public activeTimeModo1$ = new BehaviorSubject<number>(2000);     // tiempo ON modo 1
+
+
   // =================================================================
   // PROPIEDADES INTERNAS
   // =================================================================
@@ -94,6 +98,8 @@ export class BluetoothService {
   // MÉTODOS PÚBLICOS DE CONFIGURACIÓN Y ESTADO
   // =================================================================
 
+   
+  
   public setDistanceThreshold(newThreshold: number): void {
     if (newThreshold > 0 && newThreshold !== this.configurableThresholdSubject.value) {
       this.ngZone.run(() => {
@@ -351,4 +357,6 @@ export class BluetoothService {
     
     console.log(`[BT Service Log] ${newLog}`);
   }
+
+  
 }

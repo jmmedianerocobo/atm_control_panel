@@ -1,13 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { BluetoothService } from '../services/bluetooth.service';
 import { App } from '@capacitor/app';
+import { combineLatest } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { CommonModule, AsyncPipe, DecimalPipe } from '@angular/common';
 import {
-  IonToggle,
-  IonCard, IonCardHeader, IonCardSubtitle, IonCardContent,
-  IonHeader, IonToolbar, IonTitle,
+  IonToggle, IonHeader, IonToolbar, IonTitle,
   IonContent, IonButtons, IonBackButton,
   IonChip, IonLabel, IonButton, IonIcon
 } from '@ionic/angular/standalone';
@@ -18,197 +18,107 @@ import {
   styleUrls: ['./distance-view.page.scss'],
   standalone: true,
   imports: [
-    CommonModule,
-    AsyncPipe,
-    DecimalPipe,
-    IonToggle,
-    IonCard, IonCardHeader, IonCardSubtitle, IonCardContent,
-    IonHeader, IonToolbar, IonTitle,
+    CommonModule, AsyncPipe, DecimalPipe,
+    IonToggle, IonHeader, IonToolbar, IonTitle,
     IonContent, IonButtons, IonBackButton,
     IonChip, IonLabel, IonButton, IonIcon,
   ],
 })
-export class DistanceViewPage {
+export class DistanceViewPage implements OnDestroy {
 
-  // ==== Observables desde el servicio ====
-  distanceLeft$ = this.bt.distanceLeft$;
-  distanceRight$ = this.bt.distanceRight$;
-  relayLeft$ = this.bt.relayLeft$;
-  relayRight$ = this.bt.relayRight$;
-  isConnected$ = this.bt.isConnected$;
-  thresholdCm$ = this.bt.thresholdCm$;
+  distanceLeft$   = this.bt.distanceLeft$;
+  distanceRight$  = this.bt.distanceRight$;
+  relayLeft$      = this.bt.relayLeft$;
+  relayRight$     = this.bt.relayRight$;
+  enabledLeft$    = this.bt.enabledLeft$;
+  enabledRight$   = this.bt.enabledRight$;
+  isConnected$    = this.bt.isConnected$;
+  litersPerMin$   = this.bt.litersPerMin$;
+  numApplicators$ = this.bt.numApplicators$;
+  mode$           = this.bt.mode$;
+  grPerSec$       = this.bt.grPerSec$;
 
-  litersPerMin:number = 0;
-  numApplicators:number = 0;
+  private statsInterval: any = null;
 
-
-  // ==== Toggles visuales ====
-  toggleLeftActive = true;
-  toggleRightActive = true;
-
-  // ============================================================
-  // === CAMPOS QUE USA EL HTML (obligatorio para evitar errores)
-  // ============================================================
-
-  // Tiempo de apertura (segundos)
-  timeOpenLeft = 0;
-  timeOpenRight = 0;
-
-  // Número de aperturas (veces que cruzó el umbral)
-  openCountLeft = 0;
-  openCountRight = 0;
-
-  // Litros consumidos (se actualizarán dinámicamente)
-  litersLeft = 0;
-  litersRight = 0;
-
-  // ======== Internos de lógica ========
-  private wasBelowLeft = false;
-  private wasBelowRight = false;
-
-  private timer: any = null;
-
-  // Puedes ajustar este caudal cuando lo conozcas (litros por segundo)
-  private FLOW_LPS = 0.20; // ejemplo: 0.20 L/s  (pon aquí tu valor real)
+  // ✅ Stats simplificadas - usa valores directos del servicio
+  relayStats$ = combineLatest([
+    this.bt.relayLeftTimeMs$,
+    this.bt.relayLeftActivations$,
+    this.bt.relayRightTimeMs$,
+    this.bt.relayRightActivations$,
+  ]).pipe(
+    map(([leftMs, leftAct, rightMs, rightAct]) => ({
+      L: { timeMs: leftMs, activations: leftAct },
+      R: { timeMs: rightMs, activations: rightAct }
+    }))
+  );
 
   constructor(
     private router: Router,
     public bt: BluetoothService
   ) {}
 
-  // ============================================================
-  // CICLO DE VIDA
-  // ============================================================
   ionViewWillEnter() {
-    console.log('[DistanceView] entered');
-
-    // Pedir estado real al Arduino al entrar
     if (this.bt.isConnected$.value) {
       this.bt.requestStatus().catch(() => {});
+      this.bt.requestRelayStats().catch(() => {});
+      this.bt.ping().catch(() => {});
+      this.startStatsPolling();
     }
-
-    // Reset de contadores cada vez que abres la pantalla
-    this.resetStats();
-
-    // Iniciar timer
-    this.startTimer();
-
-    // Detectar cuando cruza el umbral → cuenta como APERTURA
-    this.bt.distanceLeft$.subscribe(dist => {
-      const th = this.bt.thresholdCm$.value;
-
-      if (dist !== null) {
-        if (dist < th && !this.wasBelowLeft) {
-          this.openCountLeft++;      // 🔥 nueva apertura
-          this.wasBelowLeft = true;
-        }
-        if (dist >= th) {
-          this.wasBelowLeft = false;
-        }
-      }
-    });
-
-    this.bt.distanceRight$.subscribe(dist => {
-      const th = this.bt.thresholdCm$.value;
-
-      if (dist !== null) {
-        if (dist < th && !this.wasBelowRight) {
-          this.openCountRight++;      // 🔥 nueva apertura
-          this.wasBelowRight = true;
-        }
-        if (dist >= th) {
-          this.wasBelowRight = false;
-        }
-      }
-    });
-
-    this.bt.litersPerMin$.subscribe(v => {
-  this.litersPerMin = v;
-  this.updateFlow(); // recalcula FLOW_LPS
-});
-
-this.bt.numApplicators$.subscribe(v => {
-  this.numApplicators = v;
-  this.updateFlow();
-});
-
   }
 
   ionViewWillLeave() {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+    this.stopStatsPolling();
+  }
+
+  ngOnDestroy() {
+    this.stopStatsPolling();
+  }
+
+  private startStatsPolling() {
+    this.stopStatsPolling();
+    this.statsInterval = setInterval(() => {
+      if (this.bt.isConnected$.value) {
+        this.bt.requestRelayStats().catch(() => {});
+      }
+    }, 2000);
+  }
+
+  private stopStatsPolling() {
+    if (this.statsInterval) {
+      clearInterval(this.statsInterval);
+      this.statsInterval = null;
     }
   }
 
-  // ============================================================
-  // TIMER DE SEGUNDOS PARA TIEMPO DE APERTURA Y LITROS
-  // ============================================================
-  private startTimer() {
-  if (this.timer) return;
+  goToBluetoothSettings() { this.router.navigate(['/bt-settings']); }
+  openConfigPage() { this.router.navigate(['/auto-config']); }
+  exitApp() { App.exitApp(); }
 
-  this.timer = setInterval(() => {
-    const th = this.bt.thresholdCm$.value;
+  async onToggleLeft(event: any) {
+    const enabled = !!event.detail.checked;
+    try { await this.bt.setSideEnabled('L', enabled); } catch (e) { console.error(e); }
+  }
 
-    const distL = this.bt.distanceLeft$.value;
-    const distR = this.bt.distanceRight$.value;
+  async onToggleRight(event: any) {
+    const enabled = !!event.detail.checked;
+    try { await this.bt.setSideEnabled('R', enabled); } catch (e) { console.error(e); }
+  }
 
-    // 🔥 Caudal por lado (L/s)
-    const flowPerSideLPS = (this.litersPerMin * (this.numApplicators / 2)) / 60;
-
-    // --- LADO IZQUIERDO ---
-    if (distL !== null && distL < th) {
-      this.timeOpenLeft++;
-      this.litersLeft = this.timeOpenLeft * flowPerSideLPS;
+  async onResetStats() {
+    try {
+      await this.bt.resetRelayStats();
+    } catch (e) {
+      console.error('Reset stats failed', e);
     }
-
-    // --- LADO DERECHO ---
-    if (distR !== null && distR < th) {
-      this.timeOpenRight++;
-      this.litersRight = this.timeOpenRight * flowPerSideLPS;
-    }
-
-  }, 1000);
-}
-
-  // ============================================================
-  // RESET
-  // ============================================================
-  public resetStats() {
-    this.timeOpenLeft = 0;
-    this.timeOpenRight = 0;
-
-    this.openCountLeft = 0;
-    this.openCountRight = 0;
-
-    this.litersLeft = 0;
-    this.litersRight = 0;
-
-    this.wasBelowLeft = false;
-    this.wasBelowRight = false;
   }
 
-  private updateFlow() {
-  // litros por segundo = (litros/min * aplicadores) / 60
-  this.FLOW_LPS = (this.litersPerMin * this.numApplicators) / 60;
-  console.log('Nuevo FLOW_LPS =', this.FLOW_LPS);
-}
-
-
-  // ============================================================
-  // NAVEGACIÓN
-  // ============================================================
-  goToBluetoothSettings() {
-    this.router.navigate(['/bt-settings']);
+  formatMsToMinSec(ms: number | null | undefined): string {
+    const safeMs = Math.max(0, Number(ms ?? 0));
+    const totalSec = Math.floor(safeMs / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   }
-
-  openConfigPage() {
-    this.router.navigate(['/auto-config']);
-  }
-
-  exitApp(){
-    App.exitApp();
-  }
-  
 }
 

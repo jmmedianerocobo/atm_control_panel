@@ -18,7 +18,7 @@
         <ion-icon src="/assets/icon/bluetooth-outline.svg" class="bt-icon"></ion-icon>
       </ion-button>
 
-      <!-- 🔥 Botón SALIR APP -->
+      <!-- Salir App -->
       <ion-button (click)="exitApp()" fill="clear" color="danger">
         <ion-icon src="/assets/icon/power-outline.svg"></ion-icon>
       </ion-button>
@@ -31,151 +31,215 @@
       </ion-chip>
 
     </ion-buttons>
-
   </ion-toolbar>
 </ion-header>
 
-
 <ion-content class="ion-padding">
 
-  <div class="two-column-container">
+  <!-- Capturamos relayStats UNA sola vez para toda la página -->
+  <ng-container *ngIf="relayStats$ | async as stats">
 
-    <!-- ========================================================= -->
-    <!-- ========================== LEFT ========================= -->
-    <!-- ========================================================= -->
-    <div class="column panel-container">
+    <div class="two-column-container">
 
-      <div class="panel-header">Lado Izquierdo</div>
+      <!-- ================= LEFT ================= -->
+      <div class="column panel-container">
+        <div class="panel-header header-with-toggle">
+          <span>Lado Izquierdo</span>
 
-      <div class="panel-body">
+          <ion-toggle
+            class="custom-toggle"
+            color="success"
+            [checked]="(enabledLeft$ | async) === true"
+            (ionChange)="onToggleLeft($event)">
+          </ion-toggle>
+        </div>
 
-        <!-- Estado -->
- <div class="info-block"
-             [ngClass]="{
-               'active-spray': (distanceLeft$ | async)! < (thresholdCm$ | async)!,
-               'inactive-spray': (distanceLeft$ | async)! >= (thresholdCm$ | async)!
-             }">
+        <div class="panel-body">
 
-          <label>Distancia</label>
+          <div class="info-block"
+               [ngClass]="{
+                 'active-spray': (relayLeft$ | async) === true,
+                 'inactive-spray': (relayLeft$ | async) === false
+               }">
 
-          <div class="distance-row">
+            <label>Distancia</label>
 
-            <!-- Valor izquierda -->
-            <div class="distance-value">
-              <ng-container *ngIf="distanceLeft$ | async as distLeft; else noRight">
-                {{ distLeft }} cm
-              </ng-container>
-              <ng-template #noLeft>--</ng-template>
+            <div class="distance-row">
+              <div class="distance-value">
+                <ng-container *ngIf="distanceLeft$ | async as distLeft; else noLeft">
+                  {{ distLeft }} cm
+                </ng-container>
+                <ng-template #noLeft>--</ng-template>
+              </div>
+
+              <div class="spray-icon-mini"
+                   [ngClass]="{
+                     'active': (relayLeft$ | async) === true,
+                     'hidden': (relayLeft$ | async) === false
+                   }">
+                <img src="assets/icon/spray_izda_transp.svg" />
+              </div>
             </div>
-
-            <!-- Icono derecha -->
-            <div class="spray-icon-mini"
-                 [ngClass]="{
-                    'active': (distanceLeft$ | async)! < (thresholdCm$ | async)!,
-                    'hidden': (distanceLeft$ | async)! >= (thresholdCm$ | async)!
-                 }">
-              <img src="assets/icon/spray_izda_transp.svg" />
-            </div>
-
           </div>
-        </div>
 
-        <!-- Tiempo apertura -->
-        <div class="info-block">
-          <label>Tiempo en Apertura</label>
-          <div class="value">{{ timeOpenLeft | number:'1.2-2' }} s</div>
-        </div>
+          <!-- Tiempo apertura -->
+          <div class="info-block">
+            <label>
+              Tiempo en Apertura
+              <span *ngIf="(relayLeft$ | async) === true" class="live-indicator">●</span>
+            </label>
 
-        <!-- Número aperturas -->
-        <div class="info-block">
-          <label>Número de Aperturas</label>
-          <div class="value">{{ openCountLeft }}</div>
-        </div>
+            <div class="value" [class.live-value]="(relayLeft$ | async) === true">
+              {{ formatMsToMinSec(stats?.L?.timeMs) }}
+            </div>
+          </div>
 
-        <!-- Litros -->
-        <div class="info-block">
-          <label>Litros Aplicados lado Izquierdo</label>
-          <div class="value">{{ litersLeft | number:'1.2-2' }}</div>
-        </div>
+          <div class="info-block">
+            <label>Número de Aperturas</label>
+            <div class="value">
+              {{ stats?.L?.activations ?? 0 }}
+            </div>
+          </div>
 
+        </div>
       </div>
+
+      <!-- ================= RIGHT ================= -->
+      <div class="column panel-container">
+        <div class="panel-header header-with-toggle">
+          <span>Lado Derecho</span>
+
+          <ion-toggle
+            class="custom-toggle"
+            color="success"
+            [checked]="(enabledRight$ | async) === true"
+            (ionChange)="onToggleRight($event)">
+          </ion-toggle>
+        </div>
+
+        <div class="panel-body">
+
+          <div class="info-block"
+               [ngClass]="{
+                 'active-spray': (relayRight$ | async) === true,
+                 'inactive-spray': (relayRight$ | async) === false
+               }">
+
+            <label>Distancia</label>
+
+            <div class="distance-row">
+              <div class="distance-value">
+                <ng-container *ngIf="distanceRight$ | async as distRight; else noRight">
+                  {{ distRight }} cm
+                </ng-container>
+                <ng-template #noRight>--</ng-template>
+              </div>
+
+              <div class="spray-icon-mini"
+                   [ngClass]="{
+                     'active': (relayRight$ | async) === true,
+                     'hidden': (relayRight$ | async) === false
+                   }">
+                <img src="assets/icon/spray_dcha_transp.svg" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Tiempo apertura -->
+          <div class="info-block">
+            <label>
+              Tiempo en Apertura
+              <span *ngIf="(relayRight$ | async) === true" class="live-indicator">●</span>
+            </label>
+
+            <div class="value" [class.live-value]="(relayRight$ | async) === true">
+              {{ formatMsToMinSec(stats?.R?.timeMs) }}
+            </div>
+          </div>
+
+          <div class="info-block">
+            <label>Número de Aperturas</label>
+            <div class="value">
+              {{ stats?.R?.activations ?? 0 }}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </div>
 
-    <!-- ========================================================= -->
-    <!-- ========================== RIGHT ======================== -->
-    <!-- ========================================================= -->
-    <div class="column panel-container">
+    <!-- ================= TOTAL ================= -->
+    <div class="total-container">
 
-      <div class="panel-header">Lado Derecho</div>
+      <div class="total-panel">
+        <span>Total Aplicado</span>
 
-      <div class="panel-body">
+        <strong>
+          <ng-container *ngIf="mode$ | async as mode; else modo0">
 
-        <!-- Estado -->
-        <div class="info-block"
-             [ngClass]="{
-               'active-spray': (distanceRight$ | async)! < (thresholdCm$ | async)!,
-               'inactive-spray': (distanceRight$ | async)! >= (thresholdCm$ | async)!
-             }">
-
-          <label>Distancia</label>
-
-          <div class="distance-row">
-
-            <!-- Valor izquierda -->
-            <div class="distance-value">
-              <ng-container *ngIf="distanceRight$ | async as distRight; else noRight">
-                {{ distRight }} cm
+            <!-- MODO 1 -->
+            <ng-container *ngIf="mode === 1; else modo0">
+              <ng-container *ngIf="grPerSec$ | async as grps">
+                {{
+                  (((stats?.L?.timeMs ?? 0) + (stats?.R?.timeMs ?? 0)) / 1000) * grps/1000
+                  | number:'1.2-2'
+                }} Kg
+                
               </ng-container>
-              <ng-template #noRight>--</ng-template>
-            </div>
+            </ng-container>
 
-            <!-- Icono derecha -->
-            <div class="spray-icon-mini"
-                 [ngClass]="{
-                    'active': (distanceRight$ | async)! < (thresholdCm$ | async)!,
-                    'hidden': (distanceRight$ | async)! >= (thresholdCm$ | async)!
-                 }">
-              <img src="assets/icon/spray_dcha_transp.svg" />
-            </div>
+          </ng-container>
 
-          </div>
-        </div>
+          <!-- MODO 0 -->
+          <ng-template #modo0>
+            <ng-container *ngIf="litersPerMin$ | async as lpm">
+              <ng-container *ngIf="numApplicators$ | async as apps">
+                {{
+                  (((stats?.L?.timeMs ?? 0) + (stats?.R?.timeMs ?? 0)) / 1000)
+                  * (lpm * (apps || 1) / 60)
+                  | number:'1.2-2'
+                }}
+                L
+              </ng-container>
+            </ng-container>
+          </ng-template>
 
-        <div class="info-block">
-          <label>Tiempo en Apertura</label>
-          <div class="value">{{ timeOpenRight | number:'1.2-2' }} s</div>
-        </div>
+        </strong>
+      </div>
 
-        <div class="info-block">
-          <label>Número de Aperturas</label>
-          <div class="value">{{ openCountRight }}</div>
-        </div>
+      <div class="reset-panel">
 
-        <div class="info-block">
-          <label>Litros Aplicados lado Derecho</label>
-          <div class="value">{{ litersRight | number:'1.2-2' }}</div>
-        </div>
+        <ion-button
+          color="primary"
+          fill="solid"
+          (click)="bt.requestRelayStats()"
+          title="Forzar lectura inmediata de estadísticas">
+          <ion-icon slot="start" name="refresh-outline"></ion-icon>
+          Refrescar Stats
+        </ion-button>
+
+        <ion-button
+          color="danger"
+          fill="solid"
+          (click)="onResetStats()"
+          title="Poner a cero tiempo de apertura y número de aperturas">
+          <ion-icon slot="start" name="trash-outline"></ion-icon>
+          Reset Stats
+        </ion-button>
 
       </div>
+
     </div>
+
+  </ng-container>
+
+  <!-- ================= AUTO UPDATE ================= -->
+  <div class="auto-update-info" *ngIf="isConnected$ | async">
+    <ion-chip color="success" outline="true">
+      <ion-icon name="sync-outline"></ion-icon>
+      <ion-label>Actualización automática cada 2s</ion-label>
+    </ion-chip>
   </div>
-
- <div class="total-container">
-
-  <!-- Columna izquierda -->
-  <div class="total-panel">
-    <span>Total Litros Aplicados</span>
-    <strong>{{ (litersLeft + litersRight) | number:'1.2-2' }}</strong>
-  </div>
-
-  <!-- Columna derecha: botón reset -->
-  <div class="reset-panel">
-    <ion-button color="danger" fill="solid" (click)="resetStats()">
-      Reset Contadores
-    </ion-button>
-  </div>
-
-</div>
-
 
 </ion-content>

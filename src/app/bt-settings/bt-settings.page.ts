@@ -55,7 +55,7 @@ export class BtSettingsPage implements OnInit, OnDestroy {
 
   async toggleConnection() {
     if (this.isConnected$.value) {
-      this.disconnect();
+      await this.disconnect();
       return;
     }
 

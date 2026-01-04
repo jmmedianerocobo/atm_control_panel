@@ -64,6 +64,12 @@
   border-radius: 8px;
 }
 
+/* Color antracita para los iconos chevron */
+.step-btn ion-icon {
+  color: #2a2a2a !important;   /* Gris antracita */
+  fill: #2a2a2a !important;    /* Para SVG externos */
+}
+
 .value {
   font-size: 1.2rem;
   font-weight: 600;
@@ -89,6 +95,41 @@
   opacity: 0.4;
   pointer-events: none;
 }
+
+
+/* CONTENEDOR DE LA FILA DE BOTONES */
+.button-row {
+  display: flex;
+  justify-content: center;   /* Centra horizontalmente */
+  align-items: center;
+  gap: 20px;                 /* Separación uniforme entre ellos */
+  margin-top: 22px;
+}
+
+/* BOTONES CUADRADOS IZQUIERDA / DERECHA */
+.square-btn {
+  width: 90px;
+  height: 60px;
+  font-size: 14px;
+  border-radius: 10px;       /* Esquinas redondeadas */
+  text-transform: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* BOTÓN CIRCULAR STOP — PERFECTAMENTE REDONDO */
+.circle-btn {
+  width: 90px;
+  height: 90px;
+  border-radius: 100%;        /* 🔵 Esto lo hace redondo */
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 
 .column-title.distancia { color: #007aff; }
 .column-title.temporizado { color: #ff9500; }

@@ -22,8 +22,6 @@ ion-content {
   filter: invert(30%) sepia(90%) saturate(500%) hue-rotate(180deg);
 }
 
-
-
 /* HEADER */
 .panel-header {
   padding: 12px 0;
@@ -73,6 +71,51 @@ ion-content {
   font-size: 1.1rem;
   font-weight: 600;
   color: #34495e; /* 🔹 Gris profesional */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ✅ Indicador de actualización en vivo (punto pulsante) */
+.live-indicator {
+  color: #28a745;
+  font-size: 1.5rem;
+  line-height: 0;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.2);
+  }
+}
+
+/* ✅ Valor con animación cuando está en vivo */
+.value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-top: 4px;
+}
+
+.value.live-value {
+  color: #28a745;
+  animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
 }
 
 /* DISTANCE ROW */
@@ -175,6 +218,72 @@ ion-content {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+}
+
+.header-with-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* ====== TOGGLES PERSONALIZADOS ====== */
+ion-toggle.custom-toggle {
+  --handle-background: #fff;                /* color del círculo */
+  --handle-background-checked: #fff;
+  --track-background: #ff3b30;              /* rojo cuando está OFF */
+  --track-background-checked: #28c840;      /* verde cuando está ON */
+  --track-border-radius: 20px;
+  --handle-border-radius: 50%;
+  --handle-width: 20px;
+  --handle-height: 20px;
+}
+
+/* ✅ Información de actualización automática */
+.auto-update-info {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 10px;
+
+  ion-chip {
+    font-size: 0.9rem;
+    
+    ion-icon {
+      animation: spin 2s linear infinite;
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ✅ Responsive ajustes */
+@media (max-width: 768px) {
+  .column {
+    min-width: 100%;
+  }
+
+  .total-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reset-panel {
+    justify-content: stretch;
+    
+    ion-button {
+      width: 100%;
+    }
+  }
 }
 
 

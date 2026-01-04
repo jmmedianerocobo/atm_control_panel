@@ -40,14 +40,14 @@
         <ion-item>
           <ion-label><h2>Retardo entrada</h2></ion-label>
           <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaDist', -25)">
+            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaDist', -250)">
               <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
             </ion-button>
 
-            <span class="value">{{ retardoEntradaDist }} ms</span>
+            <span class="value">{{ retardoEntradaDist/1000 | number:'1.2-2' }} sg</span>
 
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaDist', 25)">
-              <ion-icon name="/assets/icon/chevron-up-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaDist', 250)">
+              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
             </ion-button>
           </div>
         </ion-item>
@@ -56,46 +56,46 @@
         <ion-item>
           <ion-label><h2>Retardo salida</h2></ion-label>
           <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoSalidaDist', -25)">
-              <ion-icon name="/assets/icon/chevron-down-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('retardoSalidaDist', -250)">
+              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
             </ion-button>
 
-            <span class="value">{{ retardoSalidaDist }} ms</span>
+            <span class="value">{{ retardoSalidaDist/1000 | number:'1.2-2'  }} sg</span>
 
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoSalidaDist', 25)">
-              <ion-icon name="/assets/icon/chevron-up-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('retardoSalidaDist', 250)">
+              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
             </ion-button>
           </div>
         </ion-item>
 
-        <!-- Litros/min -->
+        <!-- Litros/min (SOLO APP) -->
         <ion-item>
           <ion-label><h2>Litros/min (por aplicador)</h2></ion-label>
           <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('litersPerMin', -1)">
-              <ion-icon name="/assets/icon/remove-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('litersPerMin', -0.1)">
+              <ion-icon src="/assets/icon/remove-outline.svg"></ion-icon>
             </ion-button>
 
             <span class="value">{{ litersPerMin }} L/min</span>
 
-            <ion-button fill="clear" class="step-btn" (click)="step('litersPerMin', 1)">
-              <ion-icon name="/assets/icon/add-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('litersPerMin', 0.1)">
+              <ion-icon src="/assets/icon/add-outline.svg"></ion-icon>
             </ion-button>
           </div>
         </ion-item>
 
-        <!-- Nº aplicadores -->
+        <!-- Nº aplicadores (SOLO APP) -->
         <ion-item>
           <ion-label><h2>Número de aplicadores</h2></ion-label>
           <div class="stepper">
             <ion-button fill="clear" class="step-btn" (click)="step('numApplicators', -1)">
-              <ion-icon name="/assets/icon/remove-outline.svg"></ion-icon>
+              <ion-icon src="/assets/icon/remove-outline.svg"></ion-icon>
             </ion-button>
 
             <span class="value">{{ numApplicators }}</span>
 
             <ion-button fill="clear" class="step-btn" (click)="step('numApplicators', 1)">
-              <ion-icon name="/assets/icon/add-outline.svg"></ion-icon>
+              <ion-icon src="/assets/icon/add-outline.svg"></ion-icon>
             </ion-button>
           </div>
         </ion-item>
@@ -107,37 +107,71 @@
 
         <h3 class="column-title temporizado">Modo temporizado</h3>
 
-        <!-- Retardo entrada (debe usar holdTimeMs) -->
+        <!-- Retardo entrada modo 1 -->
         <ion-item>
           <ion-label><h2>Retardo entrada</h2></ion-label>
           <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('holdTimeMs', -25)">
-              <ion-icon name="/assets/icon/chevron-down-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaTemp', -250)">
+              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
             </ion-button>
 
-            <span class="value">{{ holdTimeMs }} ms</span>
+            <span class="value">{{ retardoEntradaTemp/1000 | number:'1.2-2' }} sg</span>
 
-            <ion-button fill="clear" class="step-btn" (click)="step('holdTimeMs', 25)">
-              <ion-icon name="/assets/icon/chevron-up-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaTemp', 250)">
+              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
             </ion-button>
           </div>
         </ion-item>
 
-        <!-- Temporizador apertura -->
+        <!-- Temporizador apertura modo 1 -->
         <ion-item>
           <ion-label><h2>Temporizador apertura</h2></ion-label>
           <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('activeTimeMs', -25)">
-              <ion-icon name="/assets/icon/chevron-down-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('activeTimeModo1', -250)">
+              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
             </ion-button>
 
-            <span class="value">{{ activeTimeMs }} ms</span>
+            <span class="value">{{ activeTimeModo1/1000 | number:'1.2-2' }} sg</span>
 
-            <ion-button fill="clear" class="step-btn" (click)="step('activeTimeMs', 25)">
-              <ion-icon name="/assets/icon/chevron-up-outline.svg"></ion-icon>
+            <ion-button fill="clear" class="step-btn" (click)="step('activeTimeModo1', 250)">
+              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
             </ion-button>
           </div>
         </ion-item>
+
+        <!-- gr/seg (SOLO modo temporizado) -->
+        <ion-item>
+          <ion-label><h2>Gramos/seg (por aplicador)</h2></ion-label>
+          <div class="stepper">
+            <ion-button fill="clear" class="step-btn" (click)="step('grPerSec', -50)">
+              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
+            </ion-button>
+
+            <span class="value">{{ grPerSec }}</span>
+
+            <ion-button fill="clear" class="step-btn" (click)="step('grPerSec', 50)">
+              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
+            </ion-button>
+          </div>
+        </ion-item>
+
+
+        <!-- Botones abajo -->
+        <div class="button-row">
+
+          <ion-button class="square-btn" color="success" (click)="startLeft()">
+            Izquierda
+          </ion-button>
+
+          <ion-button class="square-btn" color="success" (click)="startRight()">
+            Derecha
+          </ion-button>
+
+          <ion-button class="circle-btn" color="danger" (click)="stopAll()">
+            STOP
+          </ion-button>
+
+        </div>
 
       </div>
 
@@ -152,13 +186,13 @@
       <ion-label><h2>Umbral (cm)</h2></ion-label>
       <div class="stepper">
         <ion-button fill="clear" class="step-btn" (click)="step('thresholdCm', -5)">
-          <ion-icon name="/assets/icon/chevron-down-outline.svg"></ion-icon>
+          <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
         </ion-button>
 
         <span class="value">{{ thresholdCm }} cm</span>
 
         <ion-button fill="clear" class="step-btn" (click)="step('thresholdCm', 5)">
-          <ion-icon name="/assets/icon/chevron-up-outline.svg"></ion-icon>
+          <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
         </ion-button>
       </div>
     </ion-item>
@@ -167,36 +201,41 @@
       <ion-label><h2>Histéresis (cm)</h2></ion-label>
       <div class="stepper">
         <ion-button fill="clear" class="step-btn" (click)="step('hysteresisCm', -5)">
-          <ion-icon name="/assets/icon/chevron-down-outline.svg"></ion-icon>
+          <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
         </ion-button>
 
         <span class="value">{{ hysteresisCm }} cm</span>
 
         <ion-button fill="clear" class="step-btn" (click)="step('hysteresisCm', 5)">
-          <ion-icon name="/assets/icon/chevron-up-outline.svg"></ion-icon>
-        </ion-button>
-      </div>
-    </ion-item>
-
-    <ion-item>
-      <ion-label><h2>Hold (ms)</h2></ion-label>
-      <div class="stepper">
-        <ion-button fill="clear" class="step-btn" (click)="step('holdTimeMs', -25)">
-          <ion-icon name="/assets/icon/chevron-down-outline.svg"></ion-icon>
-        </ion-button>
-
-        <span class="value">{{ holdTimeMs }} ms</span>
-
-        <ion-button fill="clear" class="step-btn" (click)="step('holdTimeMs', 25)">
-          <ion-icon name="/assets/icon/chevron-up-outline.svg"></ion-icon>
+          <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
         </ion-button>
       </div>
     </ion-item>
 
   </ion-list>
 
-  <ion-button expand="block" color="primary" (click)="applyConfig()">
+  <ion-button expand="block" color="primary" [disabled]="saving" (click)="applyConfig()">
     Guardar configuración
   </ion-button>
 
 </ion-content>
+
+<!-- ✅ Toast de éxito -->
+<ion-toast
+  [isOpen]="showSuccessToast"
+  message="✓ Configuración guardada correctamente"
+  duration="2500"
+  position="top"
+  color="success"
+  (didDismiss)="showSuccessToast = false">
+</ion-toast>
+
+<!-- ✅ Toast de error -->
+<ion-toast
+  [isOpen]="showErrorToast"
+  [message]="'✗ Error al guardar: ' + errorMessage"
+  duration="3500"
+  position="top"
+  color="danger"
+  (didDismiss)="showErrorToast = false">
+</ion-toast>
