@@ -1,5 +1,6 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
+import { Preferences } from '@capacitor/preferences';
 
 declare var bluetoothSerial: any;
 
@@ -30,11 +31,9 @@ export class BluetoothService {
   // ================================================================
   public isConnected$ = new BehaviorSubject<boolean>(false);
 
-  // Listas para pantallas de BT settings (compatibilidad)
   public pairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);
   public unpairedDevices$ = new BehaviorSubject<BluetoothDevice[]>([]);
 
-  // Sensores / estado
   public distanceLeft$ = new BehaviorSubject<number>(0);
   public distanceRight$ = new BehaviorSubject<number>(0);
 
@@ -44,37 +43,49 @@ export class BluetoothService {
   public enabledLeft$ = new BehaviorSubject<boolean>(true);
   public enabledRight$ = new BehaviorSubject<boolean>(true);
 
-  // Config Arduino (source of truth tras STATUS/SNAPSHOT)
+  // ✅ Config Arduino (source of truth)
   public mode$ = new BehaviorSubject<0 | 1>(0);
-  public thresholdCm$ = new BehaviorSubject<number>(30);
-  public hysteresisCm$ = new BehaviorSubject<number>(0);
-
-  public retardoEntradaDist$ = new BehaviorSubject<number>(300);
-  public retardoSalidaDist$ = new BehaviorSubject<number>(300);
-
+  public thresholdCm$ = new BehaviorSubject<number>(50);
+  public hysteresisCm$ = new BehaviorSubject<number>(10);
+  public retardoEntradaDist$ = new BehaviorSubject<number>(0);
+  public retardoSalidaDist$ = new BehaviorSubject<number>(0);
   public retardoEntradaTemp$ = new BehaviorSubject<number>(0);
   public activeTimeModo1$ = new BehaviorSubject<number>(2000);
 
-  // Stats (compatibilidad para DistanceViewPage)
+  // Stats
   public relayStats$ = new BehaviorSubject<RelayStats>({
     L: { timeMs: 0, activations: 0 },
     R: { timeMs: 0, activations: 0 },
   });
 
-  // Stats (granular)
   public relayLeftTimeMs$ = new BehaviorSubject<number>(0);
   public relayLeftActivations$ = new BehaviorSubject<number>(0);
   public relayRightTimeMs$ = new BehaviorSubject<number>(0);
   public relayRightActivations$ = new BehaviorSubject<number>(0);
 
-  // Solo-app
-  public litersPerMin$ = new BehaviorSubject<number>(0);
-  public numApplicators$ = new BehaviorSubject<number>(1);
-
+  // Parámetros App
+  public litersPerMin$ = new BehaviorSubject<number>(1.0);
+  public numApplicators$ = new BehaviorSubject<number>(2);
   public grPerSec$ = new BehaviorSubject<number>(100);
 
   // ================================================================
-  // 🧩 PROTOCOLO (igual que Arduino)
+  // 🔑 KEYS PARA PREFERENCES
+  // ================================================================
+  private readonly PREF_MODE = 'app.mode';
+  private readonly PREF_THRESHOLD = 'app.thresholdCm';
+  private readonly PREF_HYSTERESIS = 'app.hysteresisCm';
+  private readonly PREF_RETARDO_IN_DIST = 'app.retardoEntradaDist';
+  private readonly PREF_RETARDO_OUT_DIST = 'app.retardoSalidaDist';
+  private readonly PREF_RETARDO_IN_TEMP = 'app.retardoEntradaTemp';
+  private readonly PREF_ACTIVE_TIME = 'app.activeTimeModo1';
+  private readonly PREF_ENABLE_L = 'app.enableLeft';
+  private readonly PREF_ENABLE_R = 'app.enableRight';
+  private readonly PREF_LPM = 'app.litersPerMin';
+  private readonly PREF_APPS = 'app.numApplicators';
+  private readonly PREF_GRPS = 'app.grPerSec';
+
+  // ================================================================
+  // 🧩 PROTOCOLO
   // ================================================================
   private readonly SOF1 = 0xAA;
   private readonly SOF2 = 0x55;
@@ -88,10 +99,8 @@ export class BluetoothService {
   private readonly CMD_GET_RELAYSTAT = 0x04;
   private readonly CMD_SET_ENABLE    = 0x05;
   private readonly CMD_RESET_RELAYSTAT = 0x06;
-
-  // ✅ simulación modo 1 + STOP
-  private readonly CMD_TEST_TRIGGER   = 0x07; // payload 1 byte: 'L'/'R'
-  private readonly CMD_EMERGENCY_STOP = 0x08; // sin payload
+  private readonly CMD_TEST_TRIGGER   = 0x07;
+  private readonly CMD_EMERGENCY_STOP = 0x08;
 
   private readonly EVT_BOOT      = 0x10;
   private readonly EVT_DIST      = 0x11;
@@ -121,15 +130,15 @@ export class BluetoothService {
   private cfgDirty = false;
   private readonly CFG_DEBOUNCE_MS = 200;
 
-  // Señal para esperar un EVT_STATUS "nuevo"
   private statusTick$ = new BehaviorSubject<number>(0);
 
-  // ✅ Heartbeat / watchdog
+  // ✅ Heartbeat
   private heartbeatTimer: any = null;
-  private readonly HEARTBEAT_INTERVAL_MS = 15000; // 15s
+  private readonly HEARTBEAT_INTERVAL_MS = 15000;
 
-  // ✅ Evitar reconexiones simultáneas
+  // ✅ Control de reconexión
   private reconnecting = false;
+  private readonly MAX_RECONNECT_ATTEMPTS = 3;
 
   // ================================================================
   // 📩 RX state machine
@@ -146,7 +155,95 @@ export class BluetoothService {
   private rxOff = 0;
   private rxCrc = 0;
 
-  constructor(private zone: NgZone) {}
+  constructor(private zone: NgZone) {
+    // ✅ Cargar config guardada al iniciar el servicio
+    this.loadConfigFromPreferences().catch(err => 
+      console.error('Error cargando config inicial:', err)
+    );
+  }
+
+  // ================================================================
+  // 💾 PERSISTENCIA (CRÍTICO)
+  // ================================================================
+
+  /**
+   * ✅ Guarda TODA la configuración en Preferences
+   * Incluye: parámetros Arduino + parámetros App
+   */
+  async saveConfigToPreferences(): Promise<void> {
+    try {
+      await Promise.all([
+        // Parámetros Arduino
+        Preferences.set({ key: this.PREF_MODE, value: String(this.mode$.value) }),
+        Preferences.set({ key: this.PREF_THRESHOLD, value: String(this.thresholdCm$.value) }),
+        Preferences.set({ key: this.PREF_HYSTERESIS, value: String(this.hysteresisCm$.value) }),
+        Preferences.set({ key: this.PREF_RETARDO_IN_DIST, value: String(this.retardoEntradaDist$.value) }),
+        Preferences.set({ key: this.PREF_RETARDO_OUT_DIST, value: String(this.retardoSalidaDist$.value) }),
+        Preferences.set({ key: this.PREF_RETARDO_IN_TEMP, value: String(this.retardoEntradaTemp$.value) }),
+        Preferences.set({ key: this.PREF_ACTIVE_TIME, value: String(this.activeTimeModo1$.value) }),
+        Preferences.set({ key: this.PREF_ENABLE_L, value: String(this.enabledLeft$.value ? 1 : 0) }),
+        Preferences.set({ key: this.PREF_ENABLE_R, value: String(this.enabledRight$.value ? 1 : 0) }),
+        
+        // Parámetros App
+        Preferences.set({ key: this.PREF_LPM, value: String(this.litersPerMin$.value.toFixed(1)) }),
+        Preferences.set({ key: this.PREF_APPS, value: String(Math.round(this.numApplicators$.value)) }),
+        Preferences.set({ key: this.PREF_GRPS, value: String(Math.round(this.grPerSec$.value)) }),
+      ]);
+      
+      console.log('✅ Config guardada en Preferences');
+    } catch (err) {
+      console.error('❌ Error guardando en Preferences:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * ✅ Carga TODA la configuración desde Preferences
+   * Se ejecuta al iniciar el servicio
+   */
+  async loadConfigFromPreferences(): Promise<void> {
+    try {
+      const [mode, thr, hys, inD, outD, inT, actT, enL, enR, lpm, apps, grps] = await Promise.all([
+        Preferences.get({ key: this.PREF_MODE }),
+        Preferences.get({ key: this.PREF_THRESHOLD }),
+        Preferences.get({ key: this.PREF_HYSTERESIS }),
+        Preferences.get({ key: this.PREF_RETARDO_IN_DIST }),
+        Preferences.get({ key: this.PREF_RETARDO_OUT_DIST }),
+        Preferences.get({ key: this.PREF_RETARDO_IN_TEMP }),
+        Preferences.get({ key: this.PREF_ACTIVE_TIME }),
+        Preferences.get({ key: this.PREF_ENABLE_L }),
+        Preferences.get({ key: this.PREF_ENABLE_R }),
+        Preferences.get({ key: this.PREF_LPM }),
+        Preferences.get({ key: this.PREF_APPS }),
+        Preferences.get({ key: this.PREF_GRPS }),
+      ]);
+
+      this.zone.run(() => {
+        // Parámetros Arduino (con validación)
+        if (mode.value !== null) {
+          const m = Number(mode.value);
+          this.mode$.next((m === 1) ? 1 : 0);
+        }
+        if (thr.value) this.thresholdCm$.next(Math.max(5, Math.min(300, Number(thr.value))));
+        if (hys.value) this.hysteresisCm$.next(Math.max(0, Math.min(100, Number(hys.value))));
+        if (inD.value) this.retardoEntradaDist$.next(Math.max(0, Math.min(60000, Number(inD.value))));
+        if (outD.value) this.retardoSalidaDist$.next(Math.max(0, Math.min(60000, Number(outD.value))));
+        if (inT.value) this.retardoEntradaTemp$.next(Math.max(0, Math.min(60000, Number(inT.value))));
+        if (actT.value) this.activeTimeModo1$.next(Math.max(0, Math.min(600000, Number(actT.value))));
+        if (enL.value !== null) this.enabledLeft$.next(Number(enL.value) !== 0);
+        if (enR.value !== null) this.enabledRight$.next(Number(enR.value) !== 0);
+
+        // Parámetros App
+        if (lpm.value) this.litersPerMin$.next(Math.max(0, Number(lpm.value)));
+        if (apps.value) this.numApplicators$.next(Math.max(1, Math.round(Number(apps.value))));
+        if (grps.value) this.grPerSec$.next(Math.max(0, Math.round(Number(grps.value))));
+      });
+      
+      console.log('✅ Config cargada desde Preferences');
+    } catch (err) {
+      console.error('⚠️ Error cargando Preferences (usando defaults):', err);
+    }
+  }
 
   // ================================================================
   // 🔎 ESCANEO / CONEXIÓN
@@ -173,7 +270,7 @@ export class BluetoothService {
     return new Promise((resolve, reject) => {
       const fn = bluetoothSerial?.discoverUnpaired;
       if (typeof fn !== 'function') {
-        reject(new Error('discoverUnpaired not supported by this plugin'));
+        reject(new Error('discoverUnpaired not supported'));
         return;
       }
       bluetoothSerial.discoverUnpaired(
@@ -200,7 +297,7 @@ export class BluetoothService {
       ? { name: address, address }
       : deviceOrAddress;
 
-    // Cleanup defensivo
+    // Cleanup
     try { bluetoothSerial.unsubscribeRawData(() => {}, () => {}); } catch {}
     try { bluetoothSerial.unsubscribe(() => {}, () => {}); } catch {}
 
@@ -211,11 +308,17 @@ export class BluetoothService {
     this.zone.run(() => this.isConnected$.next(true));
     this.subscribeToIncomingRaw();
 
-    // Sync inicial
+    // ✅ ESTRATEGIA: Pedir estado del Arduino (tiene EEPROM)
+    // Arduino es master, sincronizamos con él
     await this.requestStatus().catch(() => {});
     await this.requestRelayStats().catch(() => {});
 
+    // ✅ Guardar lo que tiene Arduino en Preferences (sincronización)
+    await this.saveConfigToPreferences().catch(() => {});
+
     this.startHeartbeat();
+    
+    console.log('✅ Conectado y sincronizado con Arduino');
   }
 
   async disconnect(): Promise<void> {
@@ -228,7 +331,6 @@ export class BluetoothService {
     this.cfgDirty = false;
     this.cfgInFlight = false;
 
-    // Cancelar comandos en espera
     this.queue.forEach(cmd => {
       clearTimeout(cmd.timer);
       cmd.reject('Disconnected');
@@ -255,7 +357,6 @@ export class BluetoothService {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
       if (!this.isConnected$.value) return;
-      // si hay envío de config en vuelo, no molestes
       if (this.cfgInFlight) return;
 
       this.ping().catch(() => {
@@ -272,13 +373,22 @@ export class BluetoothService {
     }
   }
 
+  // ✅ MEJORADO: Límite de reintentos
+  private reconnectAttempts = 0;
+
   private async reconnect(): Promise<void> {
     if (this.reconnecting) return;
     if (!this.device) return;
 
-    this.reconnecting = true;
+    // ✅ Límite de reintentos
+    if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
+      console.error('❌ Máximo de reintentos alcanzado');
+      return;
+    }
 
-    // Serializa la reconexión contra cmdChain para que no pise envíos
+    this.reconnecting = true;
+    this.reconnectAttempts++;
+
     const run = async () => {
       const deviceToReconnect = this.device!;
       try {
@@ -289,6 +399,7 @@ export class BluetoothService {
       try {
         await this.connect(deviceToReconnect);
         console.log('✅ Reconnected successfully');
+        this.reconnectAttempts = 0; // ✅ Reset counter on success
       } catch (e) {
         console.error('❌ Reconnection failed:', e);
       }
@@ -323,8 +434,8 @@ export class BluetoothService {
   // ================================================================
   private buildFrame(type: number, seq: number, payload?: Uint8Array): Uint8Array {
     const len = payload?.length ?? 0;
-    const header = 2 + 1 + 1 + 2 + 2; // SOF1 SOF2 VER TYPE SEQ LEN
-    const total = header + len + 2;   // + CRC16
+    const header = 2 + 1 + 1 + 2 + 2;
+    const total = header + len + 2;
 
     const out = new Uint8Array(total);
     let o = 0;
@@ -343,7 +454,6 @@ export class BluetoothService {
     if (payload && len > 0) out.set(payload, o);
     o += len;
 
-    // CRC sobre: VER..PAYLOAD (excluye SOF)
     const crcData = out.slice(2, 2 + 1 + 1 + 2 + 2 + len);
     const crc = this.crc16_ccitt(crcData);
 
@@ -360,7 +470,7 @@ export class BluetoothService {
   }
 
   // ================================================================
-  // 🧾 WRITE (SIEMPRE ArrayBuffer) -> evita CRC corrupto
+  // 🧾 WRITE
   // ================================================================
   private async writeBytes(bytes: Uint8Array): Promise<void> {
     return new Promise<void>((resolve, reject) => {
@@ -370,7 +480,7 @@ export class BluetoothService {
   }
 
   // ================================================================
-  // 🚀 ENVÍO DE COMANDOS (serializado + retry)
+  // 🚀 ENVÍO DE COMANDOS
   // ================================================================
   private async sendCmdInternal(cmdType: number, payload?: Uint8Array, timeoutMs = 3000): Promise<void> {
     if (!this.isConnected$.value) throw new Error('Not connected');
@@ -581,6 +691,7 @@ export class BluetoothService {
 
     switch (type) {
       case this.EVT_BOOT:
+        console.log('📡 EVT_BOOT recibido');
         return;
 
       case this.EVT_DIST: {
@@ -608,7 +719,7 @@ export class BluetoothService {
       }
 
       case this.EVT_SNAPSHOT: {
-        if (payload.length < (5 + 2 + 2 + 2 + 2 + 2 + 4)) return;
+        if (payload.length < 19) return;
 
         const Lr = payload[0] === 1;
         const Rr = payload[1] === 1;
@@ -626,10 +737,8 @@ export class BluetoothService {
         this.zone.run(() => {
           this.relayLeft$.next(Lr);
           this.relayRight$.next(Rr);
-
           this.enabledLeft$.next(enL);
           this.enabledRight$.next(enR);
-
           this.mode$.next(m);
           this.thresholdCm$.next(thr);
           this.hysteresisCm$.next(hys);
@@ -642,17 +751,15 @@ export class BluetoothService {
       }
 
       case this.EVT_STATUS: {
-        if (payload.length < (4 + 5 + 2 + 2 + 2 + 2 + 2 + 4)) return;
+        if (payload.length < 23) return;
 
         const dL = this.u16LE(payload, 0);
         const dR = this.u16LE(payload, 2);
-
         const RL = payload[4] === 1;
         const RR = payload[5] === 1;
         const enL = payload[6] === 1;
         const enR = payload[7] === 1;
         const m = payload[8] === 1 ? 1 : 0;
-
         const thr = this.u16LE(payload, 9);
         const hys = this.u16LE(payload, 11);
         const in0 = this.u16LE(payload, 13);
@@ -663,13 +770,10 @@ export class BluetoothService {
         this.zone.run(() => {
           this.distanceLeft$.next(dL);
           this.distanceRight$.next(dR);
-
           this.relayLeft$.next(RL);
           this.relayRight$.next(RR);
-
           this.enabledLeft$.next(enL);
           this.enabledRight$.next(enR);
-
           this.mode$.next(m);
           this.thresholdCm$.next(thr);
           this.hysteresisCm$.next(hys);
@@ -678,6 +782,7 @@ export class BluetoothService {
           this.retardoEntradaTemp$.next(in1);
           this.activeTimeModo1$.next(active1);
 
+          // ✅ Señal para confirmConfigApplied()
           this.statusTick$.next(this.statusTick$.value + 1);
         });
         return;
@@ -745,13 +850,10 @@ export class BluetoothService {
     let o = 0;
 
     pl[o++] = c.mode & 0xFF;
-
     pl[o++] = c.thresholdCm & 0xFF;   pl[o++] = (c.thresholdCm >> 8) & 0xFF;
     pl[o++] = c.hysteresisCm & 0xFF;  pl[o++] = (c.hysteresisCm >> 8) & 0xFF;
-
     pl[o++] = c.retardoEntradaDist & 0xFF; pl[o++] = (c.retardoEntradaDist >> 8) & 0xFF;
     pl[o++] = c.retardoSalidaDist & 0xFF;  pl[o++] = (c.retardoSalidaDist >> 8) & 0xFF;
-
     pl[o++] = c.retardoEntradaTemp & 0xFF; pl[o++] = (c.retardoEntradaTemp >> 8) & 0xFF;
 
     const a = (c.activeTimeModo1 >>> 0);
@@ -764,11 +866,15 @@ export class BluetoothService {
   private async confirmConfigApplied(desired: ReturnType<BluetoothService['snapshotConfig']>, timeoutMs = 2000): Promise<void> {
     return new Promise<void>(async (resolve, reject) => {
       const prev = this.statusTick$.value;
+      let resolved = false;
 
       const sub = this.statusTick$.subscribe(v => {
+        if (resolved) return;
+        
         if (v !== prev) {
           clearTimeout(t);
           sub.unsubscribe();
+          resolved = true;
 
           const got = this.snapshotConfig();
           const same =
@@ -780,27 +886,35 @@ export class BluetoothService {
             got.retardoEntradaTemp === desired.retardoEntradaTemp &&
             got.activeTimeModo1 === desired.activeTimeModo1;
 
-          if (!same) reject(new Error('CONFIG_MISMATCH'));
-          else resolve();
+          if (!same) {
+            console.error('❌ CONFIG_MISMATCH:', { desired, got });
+            reject(new Error('CONFIG_MISMATCH'));
+          } else {
+            resolve();
+          }
         }
       });
 
       const t = setTimeout(() => {
+        if (resolved) return;
         sub.unsubscribe();
-        reject('STATUS timeout');
+        resolved = true;
+        reject(new Error('STATUS timeout'));
       }, timeoutMs);
 
       try {
         await this.requestStatus();
       } catch (e) {
+        if (resolved) return;
         clearTimeout(t);
         sub.unsubscribe();
+        resolved = true;
         reject(e);
       }
     });
   }
 
-  // ✅ Envío final de config (pausa heartbeat para evitar CRC_ERR)
+  // ✅ Envío final (con persistencia automática)
   private async flushConfig(): Promise<void> {
     if (!this.isConnected$.value || this.cfgInFlight || !this.cfgDirty) return;
 
@@ -815,6 +929,10 @@ export class BluetoothService {
       const pl = this.buildConfigPayload(desired);
       await this.sendCmd(this.CMD_SET_CONFIG, pl, 3000);
       await this.confirmConfigApplied(desired, 2000);
+      
+      // ✅ GUARDAR automáticamente tras confirmación
+      await this.saveConfigToPreferences();
+      
     } finally {
       this.cfgInFlight = false;
       this.startHeartbeat();
@@ -836,7 +954,6 @@ export class BluetoothService {
   async resetRelayStats(): Promise<void> {
     await this.sendCmd(this.CMD_RESET_RELAYSTAT);
 
-    // UI optimista
     this.zone.run(() => {
       this.relayLeftTimeMs$.next(0);
       this.relayLeftActivations$.next(0);
@@ -859,6 +976,7 @@ export class BluetoothService {
     return this.flushConfig();
   }
 
+  // ✅ CORREGIDO: Evitar race con scheduleConfigSend()
   applyConfigOnce(cfg: {
     mode: 0 | 1;
     thresholdCm: number;
@@ -867,14 +985,26 @@ export class BluetoothService {
     retardoSalidaDist: number;
     retardoEntradaTemp: number;
     activeTimeModo1: number;
-  }) {
-    this.mode$.next(cfg.mode);
-    this.thresholdCm$.next(Math.round(cfg.thresholdCm));
-    this.hysteresisCm$.next(Math.round(cfg.hysteresisCm));
-    this.retardoEntradaDist$.next(Math.round(cfg.retardoEntradaDist));
-    this.retardoSalidaDist$.next(Math.round(cfg.retardoSalidaDist));
-    this.retardoEntradaTemp$.next(Math.round(cfg.retardoEntradaTemp));
-    this.activeTimeModo1$.next(Math.round(cfg.activeTimeModo1));
+  }): Promise<void> {
+    // ✅ Cancelar debounce pendiente
+    if (this.cfgTimer) {
+      clearTimeout(this.cfgTimer);
+      this.cfgTimer = null;
+    }
+    this.cfgDirty = false;
+
+    // Actualizar BehaviorSubjects SIN disparar scheduleConfigSend()
+    this.zone.run(() => {
+      this.mode$.next(cfg.mode);
+      this.thresholdCm$.next(Math.round(cfg.thresholdCm));
+      this.hysteresisCm$.next(Math.round(cfg.hysteresisCm));
+      this.retardoEntradaDist$.next(Math.round(cfg.retardoEntradaDist));
+      this.retardoSalidaDist$.next(Math.round(cfg.retardoSalidaDist));
+      this.retardoEntradaTemp$.next(Math.round(cfg.retardoEntradaTemp));
+      this.activeTimeModo1$.next(Math.round(cfg.activeTimeModo1));
+    });
+
+    // Enviar inmediatamente
     return this.applyConfig();
   }
 
@@ -919,7 +1049,8 @@ export class BluetoothService {
     this.scheduleConfigSend();
   }
 
-  setSideEnabled(side: 'L' | 'R', enabled: boolean) {
+  // ✅ MEJORADO: Guardar tras confirmar
+  async setSideEnabled(side: 'L' | 'R', enabled: boolean): Promise<void> {
     if (side === 'L') this.enabledLeft$.next(enabled);
     if (side === 'R') this.enabledRight$.next(enabled);
 
@@ -927,15 +1058,18 @@ export class BluetoothService {
     pl[0] = side.charCodeAt(0) & 0xFF;
     pl[1] = enabled ? 1 : 0;
 
-    return this.sendCmd(this.CMD_SET_ENABLE, pl, 3000);
+    await this.sendCmd(this.CMD_SET_ENABLE, pl, 3000);
+    
+    // ✅ Guardar tras confirmar
+    await this.saveConfigToPreferences();
   }
 
-  // Solo-app
-  setLitersPerMin(v: number) { this.litersPerMin$.next(v); }
-  setNumApplicators(v: number) { this.numApplicators$.next(v); }
-  setGrPerSec(v: number) { this.grPerSec$.next(v); }
+  // Parámetros App (solo actualización local, no se envían a Arduino)
+  setLitersPerMin(v: number) { this.litersPerMin$.next(Math.max(0, v)); }
+  setNumApplicators(v: number) { this.numApplicators$.next(Math.max(1, Math.round(v))); }
+  setGrPerSec(v: number) { this.grPerSec$.next(Math.max(0, Math.round(v))); }
 
-  // ✅ Simulación modo 1 (botones)
+  // ✅ Test trigger
   async testTrigger(side: 'L' | 'R'): Promise<void> {
     const pl = new Uint8Array(1);
     pl[0] = side.charCodeAt(0) & 0xFF;
