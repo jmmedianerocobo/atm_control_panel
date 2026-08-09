@@ -1,0 +1,289 @@
+ion-content {
+  --ion-background-color: #e0f0f5 !important;
+  color: #2c3e50; /* 🔹 Texto principal elegante */
+}
+
+/* PANEL */
+.panel-container {
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  border: 1px solid #d0d0d0;
+}
+
+.btn-blue {
+  --color: #007bff;     /* azul estilo Bootstrap */
+  --border-color: #007bff;
+}
+
+.bt-icon {
+  width: 24px;
+  height: 24px;
+  filter: invert(30%) sepia(90%) saturate(500%) hue-rotate(180deg);
+}
+
+/* HEADER */
+.panel-header {
+  padding: 12px 0;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  border-bottom: 3px solid #00b894;
+  background: #fff;
+  color: #1f3a93; /* 🔹 Azul elegante */
+}
+
+/* BODY */
+.panel-body {
+  background: #8ef2f0;
+  padding: 25px 15px;
+}
+
+/* INFO BLOCK */
+.info-block {
+  background: #ffffff !important;
+  border-radius: 12px;
+  border: 1px solid #dcdcdc;
+  padding: 12px 18px;
+  min-height: 95px;
+  margin-bottom: 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: background-color 0.25s, border-color 0.25s;
+  color: #2c3e50; /* 🔹 Siempre texto oscuro */
+}
+
+/* Fondo verde cuando activo */
+.info-block.active-spray {
+  background-color: #b6f7c1 !important;
+  border-color: #28a745 !important;
+  color: #1e3d24 !important; /* 🔹 Texto más oscuro para fondo verde */
+}
+
+.info-block.inactive-spray {
+  background-color: #ffffff !important;
+}
+
+/* Labels */
+.info-block label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #34495e; /* 🔹 Gris profesional */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ✅ Indicador de actualización en vivo (punto pulsante) */
+.live-indicator {
+  color: #28a745;
+  font-size: 1.5rem;
+  line-height: 0;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.2);
+  }
+}
+
+/* ✅ Valor con animación cuando está en vivo */
+.value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-top: 4px;
+}
+
+.value.live-value {
+  color: #28a745;
+  animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* DISTANCE ROW */
+.distance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* Valor distancia */
+.distance-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #2c3e50; /* 🔹 Elegante y bien visible */
+}
+
+/* ICONO SPRAY MINI */
+.spray-icon-mini {
+  width: 55px;
+  height: 55px;
+  background: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+  transition: background-color 0.25s, transform 0.25s, opacity 0.25s ease;
+}
+
+/* Icono cuando activo */
+.spray-icon-mini.active {
+  background: #27ae60 !important; /* 🔹 Verde elegante más oscuro */
+  border: 2px solid #1e874b;
+  transform: scale(1.05);
+  opacity: 1;
+}
+
+.spray-icon-mini.hidden {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.spray-icon-mini img {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+
+/* COLUMNAS */
+.two-column-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.column {
+  flex: 1;
+  min-width: 350px;
+}
+
+/* TOTAL PANEL */
+.total-panel {
+  background: white;
+  padding: 18px;
+  margin-top: 25px;
+  border-radius: 14px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  font-size: 1.6rem;
+  display: flex;
+  justify-content: space-between;
+  color: #2c3e50; /* 🔹 Texto oscuro elegante */
+}
+
+/* Contenedor general de 2 columnas */
+.total-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 25px;
+  gap: 20px;
+}
+
+/* Panel de totales */
+.total-panel {
+  flex: 1;
+  background: white;
+  padding: 18px;
+  border-radius: 14px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  font-size: 1.6rem;
+  color: #2c3e50;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Panel del botón */
+.reset-panel {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.header-with-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* ====== TOGGLES PERSONALIZADOS ====== */
+ion-toggle.custom-toggle {
+  --handle-background: #fff;                /* color del círculo */
+  --handle-background-checked: #fff;
+  --track-background: #ff3b30;              /* rojo cuando está OFF */
+  --track-background-checked: #28c840;      /* verde cuando está ON */
+  --track-border-radius: 20px;
+  --handle-border-radius: 50%;
+  --handle-width: 20px;
+  --handle-height: 20px;
+}
+
+/* ✅ Información de actualización automática */
+.auto-update-info {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 10px;
+
+  ion-chip {
+    font-size: 0.9rem;
+    
+    ion-icon {
+      animation: spin 2s linear infinite;
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ✅ Responsive ajustes */
+@media (max-width: 768px) {
+  .column {
+    min-width: 100%;
+  }
+
+  .total-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reset-panel {
+    justify-content: stretch;
+    
+    ion-button {
+      width: 100%;
+    }
+  }
+}
+
+

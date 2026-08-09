@@ -52,7 +52,7 @@ import {
   unlinkOutline
 } from 'ionicons/icons';
 
-import { BluetoothService, BluetoothDevice, DistanceTracking } from '../services/bluetooth.service';
+import { BluetoothService, BluetoothDevice, DistanceTracking } from '../services/bluetooth.service_lst';
 
 declare var bluetoothSerial: any;
 

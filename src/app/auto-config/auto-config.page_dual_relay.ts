@@ -8,7 +8,7 @@ import {
 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { BluetoothService } from '../services/bluetooth.service';
+import { BluetoothService } from '../services/bluetooth.service_lst';
 
 @Component({
   selector: 'app-auto-config',

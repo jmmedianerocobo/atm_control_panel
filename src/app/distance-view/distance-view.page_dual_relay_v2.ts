@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, interval, combineLatest, Subscription } from 'rxjs';
 import { map, startWith, distinctUntilChanged, tap } from 'rxjs/operators';
-import { BluetoothService } from '../services/bluetooth.service'; 
+import { BluetoothService } from '../services/bluetooth.service_lst'; 
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule, AsyncPipe, DecimalPipe } from '@angular/common';

@@ -3,146 +3,284 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/distance-view"></ion-back-button>
     </ion-buttons>
+
     <ion-title>Bluetooth</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-chip
+        class="connection-chip"
+        [color]="(isConnected$ | async) ? 'success' : 'danger'">
+        <ion-icon
+          [name]="(isConnected$ | async)
+            ? 'bluetooth-outline'
+            : 'close-circle-outline'">
+        </ion-icon>
+
+        <ion-label>
+          {{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}
+        </ion-label>
+      </ion-chip>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
+<ion-content class="bt-content">
 
-  <!-- =======================
-       ESTADO PRINCIPAL
-  ========================== -->
-  <div class="status-card" 
-       [ngClass]="{
-         'state-disconnected': !(isConnected$ | async) && !isConnecting,
-         'state-connecting': isConnecting,
-         'state-connected': (isConnected$ | async)
-       }">
+  <!-- ESTADO PRINCIPAL -->
+  <section class="status-card" [ngClass]="statusClass">
 
-    <div class="status-icon">
-      <ion-icon name="bluetooth" *ngIf="!isConnecting"></ion-icon>
-      <ion-spinner *ngIf="isConnecting"></ion-spinner>
+    <div class="status-icon-wrap">
+      <ion-icon
+        *ngIf="!isConnecting"
+        name="bluetooth-outline"
+        [class.icon-pulse]="isConnected$ | async">
+      </ion-icon>
+
+      <ion-spinner
+        *ngIf="isConnecting"
+        name="crescent">
+      </ion-spinner>
     </div>
 
-    <div class="status-text">
-      <h2 *ngIf="!(isConnected$ | async) && !isConnecting">Desconectado</h2>
-      <h2 *ngIf="isConnecting">Conectando…</h2>
-      <h2 *ngIf="isConnected$ | async">Conectado</h2>
-      <p>{{ (isConnected$ | async) ? 'El dispositivo está listo.' : 'Ningún dispositivo conectado.' }}</p>
+    <div class="status-info">
+      <span class="status-label">Estado Bluetooth</span>
+      <strong class="status-title">{{ statusTitle }}</strong>
+      <small class="status-sub">{{ statusSubtitle }}</small>
     </div>
 
-    <!-- BOTÓN ACCIÓN PRINCIPAL -->
-    <ion-button expand="block"
-                [color]="(isConnected$ | async) ? 'danger' : 'primary'"
-                (click)="toggleConnection()">
+    <ion-button
+      class="main-action"
+      fill="solid"
+      size="small"
+      [color]="(isConnected$ | async) ? 'danger' : 'primary'"
+      [disabled]="isConnecting || isScanning"
+      (click)="toggleConnection()">
 
-      <ng-container *ngIf="!(isConnected$ | async) && !isConnecting">
-        Buscar y Conectar
-      </ng-container>
+      <ion-icon
+        slot="start"
+        [name]="(isConnected$ | async)
+          ? 'close-outline'
+          : 'search-outline'">
+      </ion-icon>
 
-      <ng-container *ngIf="isConnecting">
-        Cancelar
-      </ng-container>
-
-      <ng-container *ngIf="isConnected$ | async">
-        Desconectar
-      </ng-container>
-
+      {{ (isConnected$ | async) ? 'Desconectar' : 'Buscar' }}
     </ion-button>
-  </div>
 
-  <!-- =======================
-       DISPOSITIVOS EMPAREJADOS
-  ========================== -->
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Dispositivos emparejados</ion-card-title>
-    </ion-card-header>
+  </section>
 
-    <ion-list>
-      <ion-item *ngFor="let dev of pairedDevices$ | async">
-        <ion-label>
-          <h2>{{ dev.name }}</h2>
-          <p>{{ dev.address }}</p>
-        </ion-label>
+  <!-- DOS COLUMNAS -->
+  <section class="bt-grid">
 
-        <ion-button color="primary"
-                    [disabled]="isConnected$ | async"
-                    (click)="connectTo(dev)">
-          Conectar
-        </ion-button>
-      </ion-item>
+    <!-- COLUMNA IZQUIERDA -->
+    <div class="bt-column">
 
-      <ion-item *ngIf="(pairedDevices$ | async)?.length === 0">
-        <ion-label>No hay dispositivos emparejados.</ion-label>
-      </ion-item>
-    </ion-list>
-  </ion-card>
+      <!-- EMPAREJADOS -->
+      <article class="section-card paired-card">
 
-  <!-- =======================
-       BÚSQUEDA NUEVOS DISPOSITIVOS
-  ========================== -->
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Buscar nuevos dispositivos</ion-card-title>
-    </ion-card-header>
+        <header class="section-hdr blue">
+          <div class="section-title">
+            <ion-icon name="phone-portrait-outline"></ion-icon>
+            <span>Dispositivos emparejados</span>
+          </div>
 
-    <ion-card-content>
-      <ion-button expand="block" color="secondary"
-                  (click)="scan()" [disabled]="isScanning">
-        <span *ngIf="!isScanning">Buscar</span>
-        <ion-spinner *ngIf="isScanning"></ion-spinner>
-      </ion-button>
-
-      <ion-list *ngIf="(unpairedDevices$ | async)?.length! > 0">
-        <ion-item *ngFor="let dev of unpairedDevices$ | async">
-          <ion-label>
-            <h2>{{ dev.name }}</h2>
-            <p>{{ dev.address }}</p>
-          </ion-label>
-
-          <ion-button color="success" (click)="tryConnect(dev)">
-            Emparejar + Conectar
+          <ion-button
+            fill="clear"
+            size="small"
+            color="medium"
+            [disabled]="isConnecting"
+            (click)="bt.loadPairedDevices()">
+            <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
           </ion-button>
-        </ion-item>
-      </ion-list>
+        </header>
 
-      <ion-item *ngIf="(unpairedDevices$ | async)?.length === 0 && !isScanning">
-        <ion-label>No se encontraron dispositivos nuevos.</ion-label>
-      </ion-item>
-    </ion-card-content>
-  </ion-card>
+        <div class="device-list scroll-area">
 
-  <!-- =======================
-       SENSORES
-  ========================== -->
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Sensores</ion-card-title>
-    </ion-card-header>
+          <div
+            class="device-row"
+            *ngFor="let dev of pairedDevices$ | async"
+            [class.device-active]="isActiveDevice(dev)">
 
-    <ion-card-content>
-      <ion-item>
-        <ion-label>Izquierda</ion-label>
-        <ion-chip color="primary" *ngIf="left$ | async as L">{{ L }} cm</ion-chip>
-        <ion-chip color="medium" *ngIf="!(left$ | async)">N/A</ion-chip>
-      </ion-item>
+            <div
+              class="device-icon-wrap"
+              [class.icon-connected]="isActiveDevice(dev)">
+              <ion-icon name="bluetooth-outline"></ion-icon>
+            </div>
 
-      <ion-item>
-        <ion-label>Derecha</ion-label>
-        <ion-chip color="primary" *ngIf="right$ | async as R">{{ R }} cm</ion-chip>
-        <ion-chip color="medium" *ngIf="!(right$ | async)">N/A</ion-chip>
-      </ion-item>
+            <div class="device-info">
+              <strong class="device-name">{{ dev.name }}</strong>
+              <span class="device-addr">{{ dev.address }}</span>
+            </div>
 
-      <ion-button expand="block" color="medium"
-                  [disabled]="!(isConnected$ | async)"
-                  (click)="requestStatus()">
-        Actualizar estado
-      </ion-button>
-    </ion-card-content>
-  </ion-card>
+            <ion-button
+              *ngIf="!isActiveDevice(dev)"
+              fill="solid"
+              size="small"
+              color="primary"
+              [disabled]="(isConnected$ | async) || isConnecting"
+              (click)="connectTo(dev)">
+              Conectar
+            </ion-button>
+
+            <ion-chip
+              *ngIf="isActiveDevice(dev)"
+              color="success">
+              <ion-icon name="checkmark-circle-outline"></ion-icon>
+              <ion-label>Activo</ion-label>
+            </ion-chip>
+
+          </div>
+
+          <div
+            class="empty-state"
+            *ngIf="((pairedDevices$ | async)?.length ?? 0) === 0">
+
+            <ion-icon name="bluetooth-outline"></ion-icon>
+            <span>No hay dispositivos emparejados</span>
+          </div>
+
+        </div>
+      </article>
+
+    </div>
+
+    <!-- COLUMNA DERECHA -->
+    <div class="bt-column right-column">
+
+      <!-- ESCANEO -->
+      <article class="section-card scan-card">
+
+        <header class="section-hdr purple">
+          <div class="section-title">
+            <ion-icon name="scan-outline"></ion-icon>
+            <span>Buscar dispositivos</span>
+          </div>
+
+          <ion-chip
+            [color]="isScanning ? 'warning' : 'medium'">
+            <ion-label>
+              {{ isScanning ? 'Buscando…' : 'Preparado' }}
+            </ion-label>
+          </ion-chip>
+        </header>
+
+        <div class="section-body">
+
+          <ion-button
+            class="scan-action"
+            expand="block"
+            fill="outline"
+            color="secondary"
+            [disabled]="isScanning || (isConnected$ | async) || isConnecting"
+            (click)="scan()">
+
+            <ion-icon
+              slot="start"
+              [name]="isScanning
+                ? 'hourglass-outline'
+                : 'radio-outline'">
+            </ion-icon>
+
+            {{ isScanning ? 'Buscando…' : 'Iniciar búsqueda' }}
+
+            <ion-spinner
+              *ngIf="isScanning"
+              slot="end"
+              name="dots">
+            </ion-spinner>
+          </ion-button>
+
+          <div
+            class="device-list unpaired-list scroll-area"
+            *ngIf="((unpairedDevices$ | async)?.length ?? 0) > 0">
+
+            <div
+              class="device-row"
+              *ngFor="let dev of unpairedDevices$ | async">
+
+              <div class="device-icon-wrap">
+                <ion-icon name="bluetooth-outline"></ion-icon>
+              </div>
+
+              <div class="device-info">
+                <strong class="device-name">{{ dev.name }}</strong>
+                <span class="device-addr">{{ dev.address }}</span>
+              </div>
+
+              <ion-button
+                fill="solid"
+                color="success"
+                size="small"
+                [disabled]="(isConnected$ | async) || isConnecting"
+                (click)="tryConnect(dev)">
+                Conectar
+              </ion-button>
+
+            </div>
+          </div>
+
+          <div
+            class="empty-state compact"
+            *ngIf="((unpairedDevices$ | async)?.length ?? 0) === 0 && !isScanning">
+
+            <ion-icon name="search-outline"></ion-icon>
+            <span>Pulsa “Iniciar búsqueda” para escanear</span>
+          </div>
+
+        </div>
+      </article>
+
+      <!-- SENSORES -->
+      <article class="section-card sensors-card">
+
+        <header class="section-hdr green">
+          <div class="section-title">
+            <ion-icon name="pulse-outline"></ion-icon>
+            <span>Ultrasonidos</span>
+          </div>
+
+          <ion-button
+            fill="clear"
+            size="small"
+            color="medium"
+            [disabled]="!(isConnected$ | async)"
+            (click)="requestStatus()">
+            <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+          </ion-button>
+        </header>
+
+        <div class="sensor-grid">
+
+          <div class="sensor-card">
+            <div class="sensor-icon left">
+              <ion-icon name="arrow-back-outline"></ion-icon>
+            </div>
+
+            <div class="sensor-data">
+              <span class="sensor-lbl">Izquierda</span>
+              <strong class="sensor-val">
+                {{ left$ | async }} cm
+              </strong>
+            </div>
+          </div>
+
+          <div class="sensor-card">
+            <div class="sensor-icon right">
+              <ion-icon name="arrow-forward-outline"></ion-icon>
+            </div>
+
+            <div class="sensor-data">
+              <span class="sensor-lbl">Derecha</span>
+              <strong class="sensor-val">
+                {{ right$ | async }} cm
+              </strong>
+            </div>
+          </div>
+
+        </div>
+      </article>
+
+    </div>
+
+  </section>
 
 </ion-content>
-
-
-

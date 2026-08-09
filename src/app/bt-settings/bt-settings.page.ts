@@ -1,13 +1,12 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
 import { BluetoothService, BluetoothDevice } from '../services/bluetooth.service';
 
 import {
   IonHeader, IonToolbar, IonTitle,
   IonContent, IonButtons, IonBackButton,
-  IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonButton, IonLabel, IonItem, IonList, IonChip, IonSpinner, IonIcon
+  IonButton, IonLabel, IonItem, IonList,
+  IonChip, IonSpinner, IonIcon
 } from '@ionic/angular/standalone';
 
 @Component({
@@ -19,81 +18,120 @@ import {
     CommonModule,
     IonHeader, IonToolbar, IonTitle,
     IonContent, IonButtons, IonBackButton,
-    IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-    IonButton, IonLabel, IonItem, IonList, IonChip, IonSpinner, IonIcon
-  ]
+    IonButton, IonLabel, IonItem, IonList,
+    IonChip, IonSpinner, IonIcon,
+  ],
 })
-export class BtSettingsPage implements OnInit, OnDestroy {
+export class BtSettingsPage implements OnInit {
 
-  isConnected$ = this.bt.isConnected$;
-  isConnecting = false;
-
-  pairedDevices$ = this.bt.pairedDevices$;
+  isConnected$     = this.bt.isConnected$;
+  pairedDevices$   = this.bt.pairedDevices$;
   unpairedDevices$ = this.bt.unpairedDevices$;
+  left$            = this.bt.distanceLeft$;
+  right$           = this.bt.distanceRight$;
+  // Fix: nombre/dirección del dispositivo conectado leídos del servicio
+  // (sobrevive a que esta página se destruya/recree al navegar fuera y
+  // volver), en vez de guardados en campos locales del componente que se
+  // perdían en cada recreación aunque la conexión real siguiera viva.
+  connectedDevice$ = this.bt.connectedDevice$;
 
-  left$ = this.bt.distanceLeft$;
-  right$ = this.bt.distanceRight$;
+  isConnecting = false;
+  isScanning   = false;
 
-  relayLeft$ = this.bt.relayLeft$;
-  relayRight$ = this.bt.relayRight$;
-
-  isScanning = false;
-
-  constructor(
-    public bt: BluetoothService,
-    private router: Router
-  ) {}
+  constructor(public bt: BluetoothService) {}
 
   ngOnInit() {
-    console.log('[BT-SETTINGS] init');
-    this.bt.loadPairedDevices().catch(err => console.error(err));
+    this.bt.loadPairedDevices().catch(err =>
+      console.error('Error cargando dispositivos emparejados:', err)
+    );
   }
 
-  ngOnDestroy() {
-    console.log('[BT-SETTINGS] destroy');
+  // ── Estado principal ────────────────────────────────────────────
+  get statusClass(): string {
+    if (this.isConnected$.value) return 'connected';
+    if (this.isConnecting)       return 'connecting';
+    return 'disconnected';
   }
 
+  get statusTitle(): string {
+    if (this.isConnected$.value) return 'Conectado';
+    if (this.isConnecting)       return 'Conectando…';
+    return 'Desconectado';
+  }
+
+  get statusSubtitle(): string {
+    const connectedDevice = this.bt.connectedDevice$.value;
+    if (this.isConnected$.value && connectedDevice?.name)
+      return `${connectedDevice.name} · listo`;
+    if (this.isConnected$.value) return 'Dispositivo listo';
+    if (this.isConnecting)       return 'Conectando con el dispositivo…';
+    if (this.isScanning)         return 'Buscando dispositivos…';
+    return 'Ningún dispositivo conectado';
+  }
+
+  // ── Conexión ────────────────────────────────────────────────────
   async toggleConnection() {
     if (this.isConnected$.value) {
       await this.disconnect();
       return;
     }
-
-    this.isConnecting = true;
     await this.scan();
-    this.isConnecting = false;
   }
 
   async connectTo(device: BluetoothDevice) {
     try {
-      console.log("[BT] Intentando conectar a:", device.address);
-      await this.bt.connect(device.address);
+      this.isConnecting = true;
+      // Se pasa el objeto completo (no solo la address) para que el servicio
+      // conserve el nombre real del dispositivo internamente y lo publique
+      // en connectedDevice$ (ver bluetooth.service.ts) — ya no hace falta
+      // guardarlo aquí también.
+      await this.bt.connect(device);
     } catch (err) {
-      console.error('Error al conectar', err);
-    }
-  }
-
-  async scan() {
-    this.isScanning = true;
-    try {
-      await this.bt.scanForUnpaired();
-    } catch (e) {
-      console.error("Scan error:", e);
+      console.error('Error al conectar:', err);
     } finally {
-      this.isScanning = false;
+      this.isConnecting = false;
     }
-  }
-
-  async tryConnect(device: BluetoothDevice) {
-    console.log("Intentando conectar:", device);
-    await this.connectTo(device);
   }
 
   async disconnect() {
     await this.bt.disconnect();
   }
 
+  // ── Escaneo ────────────────────────────────────────────────────
+  // Secuencial (no Promise.all): así, si scanForUnpaired() falla (típico en
+  // Android sin permisos de ubicación concedidos), no se pierde ni se
+  // enmascara el refresco ya exitoso de los dispositivos emparejados, y el
+  // log deja claro cuál de las dos operaciones ha fallado.
+  async scan() {
+    this.isScanning = true;
+    try {
+      await this.bt.loadPairedDevices().catch(err => {
+        console.error('Error cargando emparejados:', err);
+      });
+      await this.bt.scanForUnpaired();
+    } catch (err) {
+      console.error('Error escaneando no emparejados:', err);
+    } finally {
+      this.isScanning = false;
+    }
+  }
+
+  async tryConnect(device: BluetoothDevice) {
+    await this.connectTo(device);
+  }
+
+  // ── Sensores ───────────────────────────────────────────────────
   requestStatus() {
-    this.bt.requestStatus();
+    this.bt.requestStatus().catch(err =>
+      console.error('Error solicitando el estado:', err)
+    );
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────
+  // Identificación por dirección (no por nombre): evita falsos positivos si
+  // hay dos dispositivos emparejados con el mismo nombre (p.ej. "HC-05").
+  isActiveDevice(device: BluetoothDevice): boolean {
+    return this.isConnected$.value &&
+           device.address === this.bt.connectedDevice$.value?.address;
   }
 }

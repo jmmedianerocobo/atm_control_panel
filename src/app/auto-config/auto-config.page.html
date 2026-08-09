@@ -1,241 +1,426 @@
 <ion-header>
-  <ion-toolbar color="primary">
-    <ion-title>Configuración</ion-title>
+  <ion-toolbar color="dark">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/distance-view"></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>
+      <div class="toolbar-title">
+        <strong>Configuración</strong>
+        <small>{{ mode === 0 ? 'Continuo por distancia' : 'Temporizado' }}</small>
+      </div>
+    </ion-title>
+
+    <ion-buttons slot="end">
+      <ion-chip class="connection-chip" [color]="(bt.isConnected$ | async) ? 'success' : 'danger'">
+        <ion-icon [name]="(bt.isConnected$ | async) ? 'bluetooth-outline' : 'close-circle-outline'"></ion-icon>
+        <ion-label>{{ (bt.isConnected$ | async) ? 'Conectado' : 'Desconectado' }}</ion-label>
+      </ion-chip>
+      <ion-button
+        class="save-action"
+        fill="solid"
+        color="primary"
+        [disabled]="saving || !(bt.isConnected$ | async)"
+        (click)="applyConfig()">
+        <ion-icon slot="start" name="save-outline"></ion-icon>
+        {{ saving ? 'Aplicando…' : 'Aplicar' }}
+      </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
+<ion-content class="auto-config-content">
 
-  <ion-list class="config-list">
-
-    <!-- =============== TOGGLE MODO =============== -->
-    <ion-item lines="full">
-      <ion-label>
-        <h2>Modo de funcionamiento</h2>
-        <p>{{ mode === 0 ? 'Detección por distancia' : 'Temporizado' }}</p>
-      </ion-label>
-
+  <!-- =============== FRANJA DE MODOS =============== -->
+  <div class="mode-strip">
+    <div class="mode-card">
+      <div class="mode-icon blue"><ion-icon name="radio-outline"></ion-icon></div>
+      <div class="mode-copy">
+        <span class="mode-label">Fuente de disparo</span>
+        <strong>{{ sourceMode === 0 ? 'Ultrasonido' : 'Entradas PC817' }}</strong>
+      </div>
       <ion-toggle
-        slot="end"
-        color="success"
+        color="primary"
+        [checked]="sourceMode === 1"
+        (ionChange)="toggleSourceMode($event)">
+      </ion-toggle>
+    </div>
+
+    <div class="mode-card">
+      <div class="mode-icon amber"><ion-icon name="timer-outline"></ion-icon></div>
+      <div class="mode-copy">
+        <span class="mode-label">Modo de funcionamiento</span>
+        <strong>{{ mode === 0 ? 'Continuo por distancia' : 'Temporizado' }}</strong>
+      </div>
+      <ion-toggle
+        color="primary"
         [checked]="mode === 1"
         (ionChange)="toggleMode($event)">
       </ion-toggle>
-    </ion-item>
+    </div>
+  </div>
 
-    <!-- ===========================================================
-            DOS COLUMNAS
-    ============================================================ -->
-    <div class="columns-container">
+  <!-- =============== CUADRÍCULA 2×2 =============== -->
+  <div class="config-grid">
 
-      <!-- ====================== COLUMNA IZQUIERDA (Modo distancia) ====================== -->
-      <div class="column" [class.disabled]="mode !== 0">
+    <!-- ---- Modo distancia ---- -->
+    <article class="panel" [class.panel-dimmed]="sourceMode !== 0">
+      <header class="panel-header blue">
+        <div class="panel-title"><ion-icon name="pulse-outline"></ion-icon><span>Modo distancia</span></div>
+      </header>
 
-        <h3 class="column-title distancia">Modo distancia</h3>
-
-        <!-- Retardo entrada -->
-        <ion-item>
-          <ion-label><h2>Retardo entrada</h2></ion-label>
-          <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaDist', -250)">
-              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
-            </ion-button>
-
-            <span class="value">{{ retardoEntradaDist/1000 | number:'1.2-2' }} sg</span>
-
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaDist', 250)">
-              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
-            </ion-button>
+      <div class="panel-body">
+        <div class="param-row">
+          <div class="param-copy">
+            <span>Umbral</span>
+            <small>Distancia de disparo</small>
           </div>
-        </ion-item>
-
-        <!-- Retardo salida -->
-        <ion-item>
-          <ion-label><h2>Retardo salida</h2></ion-label>
           <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoSalidaDist', -250)">
-              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
-            </ion-button>
-
-            <span class="value">{{ retardoSalidaDist/1000 | number:'1.2-2'  }} sg</span>
-
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoSalidaDist', 250)">
-              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
-            </ion-button>
+            <button class="step-btn" type="button" (click)="step('thresholdCm', -5)">
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </button>
+            <strong>{{ thresholdCm }} cm</strong>
+            <button class="step-btn" type="button" (click)="step('thresholdCm', 5)">
+              <ion-icon name="chevron-up-outline"></ion-icon>
+            </button>
           </div>
-        </ion-item>
-
-        <!-- Litros/min (SOLO APP) -->
-        <ion-item>
-          <ion-label><h2>Litros/min (por aplicador)</h2></ion-label>
-          <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('litersPerMin', -0.1)">
-              <ion-icon src="/assets/icon/remove-outline.svg"></ion-icon>
-            </ion-button>
-
-            <span class="value">{{ litersPerMin }} L/min</span>
-
-            <ion-button fill="clear" class="step-btn" (click)="step('litersPerMin', 0.1)">
-              <ion-icon src="/assets/icon/add-outline.svg"></ion-icon>
-            </ion-button>
-          </div>
-        </ion-item>
-
-        <!-- Nº aplicadores (SOLO APP) -->
-        <ion-item>
-          <ion-label><h2>Número de aplicadores</h2></ion-label>
-          <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('numApplicators', -1)">
-              <ion-icon src="/assets/icon/remove-outline.svg"></ion-icon>
-            </ion-button>
-
-            <span class="value">{{ numApplicators }}</span>
-
-            <ion-button fill="clear" class="step-btn" (click)="step('numApplicators', 1)">
-              <ion-icon src="/assets/icon/add-outline.svg"></ion-icon>
-            </ion-button>
-          </div>
-        </ion-item>
-
-      </div>
-
-      <!-- ====================== COLUMNA DERECHA (Modo temporizado) ====================== -->
-      <div class="column" [class.disabled]="mode !== 1">
-
-        <h3 class="column-title temporizado">Modo temporizado</h3>
-
-        <!-- Retardo entrada modo 1 -->
-        <ion-item>
-          <ion-label><h2>Retardo entrada</h2></ion-label>
-          <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaTemp', -250)">
-              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
-            </ion-button>
-
-            <span class="value">{{ retardoEntradaTemp/1000 | number:'1.2-2' }} sg</span>
-
-            <ion-button fill="clear" class="step-btn" (click)="step('retardoEntradaTemp', 250)">
-              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
-            </ion-button>
-          </div>
-        </ion-item>
-
-        <!-- Temporizador apertura modo 1 -->
-        <ion-item>
-          <ion-label><h2>Temporizador apertura</h2></ion-label>
-          <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('activeTimeModo1', -250)">
-              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
-            </ion-button>
-
-            <span class="value">{{ activeTimeModo1/1000 | number:'1.2-2' }} sg</span>
-
-            <ion-button fill="clear" class="step-btn" (click)="step('activeTimeModo1', 250)">
-              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
-            </ion-button>
-          </div>
-        </ion-item>
-
-        <!-- gr/seg (SOLO modo temporizado) -->
-        <ion-item>
-          <ion-label><h2>Gramos/seg (por aplicador)</h2></ion-label>
-          <div class="stepper">
-            <ion-button fill="clear" class="step-btn" (click)="step('grPerSec', -50)">
-              <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
-            </ion-button>
-
-            <span class="value">{{ grPerSec }}</span>
-
-            <ion-button fill="clear" class="step-btn" (click)="step('grPerSec', 50)">
-              <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
-            </ion-button>
-          </div>
-        </ion-item>
-
-
-        <!-- Botones abajo -->
-        <div class="button-row">
-
-          <ion-button class="square-btn" color="success" (click)="startLeft()">
-            Izquierda
-          </ion-button>
-
-          <ion-button class="square-btn" color="success" (click)="startRight()">
-            Derecha
-          </ion-button>
-
-          <ion-button class="circle-btn" color="danger" (click)="stopAll()">
-            STOP
-          </ion-button>
-
         </div>
 
-      </div>
+        <div class="param-row">
+          <div class="param-copy">
+            <span>Histéresis</span>
+            <small>Margen anti-rebote</small>
+          </div>
+          <div class="stepper">
+            <button class="step-btn" type="button" (click)="step('hysteresisCm', -1)">
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </button>
+            <strong>{{ hysteresisCm }} cm</strong>
+            <button class="step-btn" type="button" (click)="step('hysteresisCm', 1)">
+              <ion-icon name="chevron-up-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
 
+        <div class="param-row">
+          <div class="param-copy">
+            <span>Retardo entrada</span>
+            <small>Antes de activar</small>
+          </div>
+          <div class="stepper">
+            <button class="step-btn" type="button" (click)="step('retardoEntradaDist', -250)">
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </button>
+            <strong>{{ retardoEntradaDist / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn" type="button" (click)="step('retardoEntradaDist', 250)">
+              <ion-icon name="chevron-up-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-copy">
+            <span>Retardo salida</span>
+            <small>Antes de desactivar</small>
+          </div>
+          <div class="stepper">
+            <button class="step-btn" type="button" (click)="step('retardoSalidaDist', -250)">
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </button>
+            <strong>{{ retardoSalidaDist / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn" type="button" (click)="step('retardoSalidaDist', 250)">
+              <ion-icon name="chevron-up-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="info-note" *ngIf="sourceMode !== 0">
+          <ion-icon name="warning-outline"></ion-icon>
+          Umbral e histéresis se ignoran: la fuente activa es "Entradas PC817".
+        </div>
+      </div>
+    </article>
+
+    <!-- ---- Modo temporizado ---- -->
+    <article class="panel" [class.panel-dimmed]="mode !== 1">
+      <header class="panel-header amber">
+        <div class="panel-title"><ion-icon name="timer-outline"></ion-icon><span>Modo temporizado</span></div>
+      </header>
+
+      <div class="panel-body">
+        <div class="param-row">
+          <div class="param-copy">
+            <span>Retardo entrada</span>
+            <small>Antes de iniciar el temporizador</small>
+          </div>
+          <div class="stepper">
+            <button class="step-btn" type="button" (click)="step('retardoEntradaTemp', -250)">
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </button>
+            <strong>{{ retardoEntradaTemp / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn" type="button" (click)="step('retardoEntradaTemp', 250)">
+              <ion-icon name="chevron-up-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-copy">
+            <span>Tiempo activo</span>
+            <small>Duración de la activación</small>
+          </div>
+          <div class="stepper">
+            <button class="step-btn" type="button" (click)="step('activeTimeModo1', -1000)">
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </button>
+            <strong>{{ activeTimeModo1 / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn" type="button" (click)="step('activeTimeModo1', 1000)">
+              <ion-icon name="chevron-up-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="info-note" *ngIf="mode !== 1">
+          <ion-icon name="warning-outline"></ion-icon>
+          Estos parámetros y las pruebas solo aplican en modo temporizado.
+        </div>
+
+        <div class="test-actions">
+          <button
+            class="test-btn"
+            type="button"
+            [disabled]="mode !== 1 || !(bt.isConnected$ | async)"
+            (click)="startLeft()">
+            <ion-icon name="arrow-back-outline"></ion-icon>
+            Probar izquierda
+          </button>
+
+          <button
+            class="stop-btn"
+            type="button"
+            [disabled]="!(bt.isConnected$ | async)"
+            (click)="stopAll()">
+            <ion-icon name="stop-circle-outline"></ion-icon>
+          </button>
+
+          <button
+            class="test-btn"
+            type="button"
+            [disabled]="mode !== 1 || !(bt.isConnected$ | async)"
+            (click)="startRight()">
+            Probar derecha
+            <ion-icon name="arrow-forward-outline"></ion-icon>
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ---- Geometría del depósito ---- -->
+    <article class="panel">
+      <header class="panel-header teal">
+        <div class="panel-title"><ion-icon name="cube-outline"></ion-icon><span>Geometría del depósito</span></div>
+      </header>
+
+      <div class="panel-body tank-config-body">
+        <!-- v11: solo lo que el firmware usa de verdad para calcular el
+             nivel (ver calcularNivel() en el .ino): capacidad (local, para
+             litros), altura útil y posición longitudinal del sensor. Se
+             elimina el selector de forma y el resto de dimensiones, que
+             nunca llegaban al firmware. -->
+        <div class="tank-config-grid">
+          <div class="tank-fields">
+            <div class="compact-param">
+              <span>Capacidad</span>
+              <div class="stepper">
+                <button class="step-btn" type="button" (click)="step('depositoCap', -50)">
+                  <ion-icon name="chevron-down-outline"></ion-icon>
+                </button>
+                <strong>{{ depositoCap }} L</strong>
+                <button class="step-btn" type="button" (click)="step('depositoCap', 50)">
+                  <ion-icon name="chevron-up-outline"></ion-icon>
+                </button>
+              </div>
+            </div>
+
+            <div class="compact-param">
+              <span>Altura del depósito</span>
+              <div class="stepper">
+                <button class="step-btn" type="button" (click)="step('tankHeightMm', -10)">
+                  <ion-icon name="chevron-down-outline"></ion-icon>
+                </button>
+                <strong>{{ tankHeightMm }} mm</strong>
+                <button class="step-btn" type="button" (click)="step('tankHeightMm', 10)">
+                  <ion-icon name="chevron-up-outline"></ion-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sensor-position">
+            <div class="sensor-position-title">
+              <ion-icon name="locate-outline"></ion-icon>
+              Posición del sensor
+            </div>
+
+            <div class="sensor-param">
+              <span>Longitudinal</span>
+              <div class="stepper">
+                <button class="step-btn" type="button" (click)="step('sensorLongitudinalMm', -10)">
+                  <ion-icon name="chevron-down-outline"></ion-icon>
+                </button>
+                <strong>{{ sensorLongitudinalMm }} mm</strong>
+                <button class="step-btn" type="button" (click)="step('sensorLongitudinalMm', 10)">
+                  <ion-icon name="chevron-up-outline"></ion-icon>
+                </button>
+              </div>
+              <small>Distancia al centro; + = sensor por delante</small>
+            </div>
+
+            <div class="info-note teal-note">
+              <ion-icon name="warning-outline"></ion-icon>
+              Con el acelerómetro, esta posición compensa el cambio de presión
+              que provoca la inclinación, para que el nivel no varíe solo
+              porque el líquido se desplaza hacia el sensor.
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- ---- Límites de alta presión ---- -->
+    <article class="panel">
+      <header class="panel-header purple">
+        <div class="panel-title"><ion-icon name="speedometer-outline"></ion-icon><span>Límites de alta presión</span></div>
+      </header>
+
+      <div class="panel-body pressure-limits-panel">
+        <div class="pressure-config-layout">
+          <div class="pressure-live-block">
+            <span>Presión actual</span>
+            <strong>{{ (highPressureBar$ | async) ?? '--' }}</strong>
+            <small>bar</small>
+            <small *ngIf="highPressureLockout$ | async" class="danger-value">Bloqueo por sobrepresión</small>
+            <small *ngIf="highPressureSensorFault$ | async" class="danger-value">Fallo del sensor</small>
+          </div>
+
+          <div class="pressure-limit-controls">
+            <div class="pressure-limit-row low-limit">
+              <div class="limit-copy">
+                <span>Límite inferior</span>
+                <small>Restablece la alarma</small>
+              </div>
+              <div class="stepper">
+                <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', -0.1)">
+                  <ion-icon name="chevron-down-outline"></ion-icon>
+                </button>
+                <strong>{{ pressureLowLimitBar | number:'1.1-1' }} bar</strong>
+                <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', 0.1)">
+                  <ion-icon name="chevron-up-outline"></ion-icon>
+                </button>
+              </div>
+            </div>
+
+            <div class="pressure-limit-row high-limit">
+              <div class="limit-copy">
+                <span>Límite superior</span>
+                <small>Dispara la alarma</small>
+              </div>
+              <div class="stepper">
+                <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', -0.1)">
+                  <ion-icon name="chevron-down-outline"></ion-icon>
+                </button>
+                <strong>{{ pressureHighLimitBar | number:'1.1-1' }} bar</strong>
+                <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', 0.1)">
+                  <ion-icon name="chevron-up-outline"></ion-icon>
+                </button>
+              </div>
+            </div>
+
+            <div class="operating-range">
+              <div class="range-track">
+                <span class="range-low" [style.width.%]="(pressureLowLimitBar / pressureSensorMaxBar) * 100"></span>
+                <span class="range-normal" [style.width.%]="((pressureHighLimitBar - pressureLowLimitBar) / pressureSensorMaxBar) * 100"></span>
+                <span class="range-high" [style.width.%]="((pressureSensorMaxBar - pressureHighLimitBar) / pressureSensorMaxBar) * 100"></span>
+              </div>
+              <div class="range-labels">
+                <span>0</span>
+                <span>{{ pressureLowLimitBar | number:'1.1-1' }}</span>
+                <span>{{ pressureHighLimitBar | number:'1.1-1' }}</span>
+                <span>{{ pressureSensorMaxBar | number:'1.0-0' }} bar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <!-- =============== CALIBRACIÓN DE NIVEL =============== -->
+  <div class="calibration-wizard">
+    <div class="calibration-wizard-header">
+      <div><ion-icon name="sync-outline"></ion-icon><span>Calibración de nivel</span></div>
+      <small>2 puntos: vacío y lleno</small>
     </div>
 
-    <!-- ===========================================================
-            PARÁMETROS DE LECTURA
-    ============================================================ -->
-    <h3 class="section-title">Parámetros de lectura</h3>
+    <div class="calibration-steps">
+      <div class="calibration-step" [class.completed]="levelCalibrated$ | async">
+        <div class="step-copy">
+          <strong>1. Vacío — cero de presión + plano MPU6050</strong>
+          <span>Confirma depósito vacío y equipo inmóvil antes de calibrar</span>
+        </div>
 
-    <ion-item>
-      <ion-label><h2>Umbral (cm)</h2></ion-label>
-      <div class="stepper">
-        <ion-button fill="clear" class="step-btn" (click)="step('thresholdCm', -5)">
-          <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
-        </ion-button>
+        <ion-chip [color]="(levelCalibrated$ | async) ? 'success' : 'medium'">
+          <ion-icon [name]="(levelCalibrated$ | async) ? 'checkmark-circle-outline' : 'warning-outline'"></ion-icon>
+          <ion-label>{{ (levelCalibrated$ | async) ? 'Calibrado' : 'Pendiente' }}</ion-label>
+        </ion-chip>
 
-        <span class="value">{{ thresholdCm }} cm</span>
-
-        <ion-button fill="clear" class="step-btn" (click)="step('thresholdCm', 5)">
-          <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
-        </ion-button>
-      </div>
-    </ion-item>
-
-    <ion-item>
-      <ion-label><h2>Histéresis (cm)</h2></ion-label>
-      <div class="stepper">
-        <ion-button fill="clear" class="step-btn" (click)="step('hysteresisCm', -5)">
-          <ion-icon src="/assets/icon/chevron-down-outline.svg"></ion-icon>
-        </ion-button>
-
-        <span class="value">{{ hysteresisCm }} cm</span>
-
-        <ion-button fill="clear" class="step-btn" (click)="step('hysteresisCm', 5)">
-          <ion-icon src="/assets/icon/chevron-up-outline.svg"></ion-icon>
+        <ion-button
+          class="calibration-action"
+          fill="solid"
+          color="primary"
+          [disabled]="calibrating || !(bt.isConnected$ | async)"
+          (click)="confirmLevelCalibration()">
+          {{ calibrating ? 'Calibrando…' : 'Calibrar vacío' }}
         </ion-button>
       </div>
-    </ion-item>
 
-  </ion-list>
+      <div class="calibration-step" [class.completed]="levelFullCalibrated$ | async">
+        <div class="step-copy">
+          <strong>2. Lleno — presión de referencia</strong>
+          <span>Confirma depósito lleno y equipo detenido antes de calibrar</span>
+        </div>
 
-  <ion-button expand="block" color="primary" [disabled]="saving" (click)="applyConfig()">
-    Guardar configuración
-  </ion-button>
+        <ion-chip [color]="(levelFullCalibrated$ | async) ? 'success' : 'medium'">
+          <ion-icon [name]="(levelFullCalibrated$ | async) ? 'checkmark-circle-outline' : 'warning-outline'"></ion-icon>
+          <ion-label>{{ (levelFullCalibrated$ | async) ? 'Calibrado' : 'Pendiente' }}</ion-label>
+        </ion-chip>
+
+        <ion-button
+          class="calibration-action"
+          fill="solid"
+          color="primary"
+          [disabled]="calibratingFull || !(levelCalibrated$ | async) || !(bt.isConnected$ | async)"
+          (click)="confirmFullLevelCalibration()">
+          {{ calibratingFull ? 'Calibrando…' : 'Calibrar lleno' }}
+        </ion-button>
+      </div>
+    </div>
+  </div>
 
 </ion-content>
 
-<!-- ✅ Toast de éxito -->
 <ion-toast
   [isOpen]="showSuccessToast"
-  message="✓ Configuración guardada correctamente"
-  duration="2500"
-  position="top"
+  [message]="successMessage"
+  duration="2200"
   color="success"
   (didDismiss)="showSuccessToast = false">
 </ion-toast>
 
-<!-- ✅ Toast de error -->
 <ion-toast
   [isOpen]="showErrorToast"
-  [message]="'✗ Error al guardar: ' + errorMessage"
-  duration="3500"
-  position="top"
+  [message]="errorMessage"
+  duration="3200"
   color="danger"
   (didDismiss)="showErrorToast = false">
 </ion-toast>

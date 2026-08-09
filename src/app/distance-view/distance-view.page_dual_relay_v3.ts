@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, Subscription } from 'rxjs';
-import { BluetoothService } from '../services/bluetooth.service';
+import { BluetoothService } from '../services/bluetooth.service_lst';
 import { Router } from '@angular/router';
 import {
   AsyncPipe,

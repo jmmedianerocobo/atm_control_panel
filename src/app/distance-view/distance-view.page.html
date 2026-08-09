@@ -1,245 +1,261 @@
 <ion-header>
-  <ion-toolbar>
-    <ion-title>ATM Control Panel</ion-title>
-
+  <ion-toolbar color="dark">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/distance-view"></ion-back-button>
+      <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
 
+    <ion-title>
+      <div class="toolbar-title">
+        <strong>ATM Control Panel</strong>
+        <small>
+          {{ sourceModeText(sourceMode$ | async) }} ·
+          {{ (mode$ | async) === 1 ? 'Temporizado' : 'Continuo' }}
+        </small>
+      </div>
+    </ion-title>
+
     <ion-buttons slot="end">
-
-      <!-- Configuración -->
-      <ion-button (click)="openConfigPage()" fill="clear">
-        <ion-icon src="/assets/icon/settings-outline.svg"></ion-icon>
+      <ion-button fill="clear" [disabled]="!(isConnected$ | async)" (click)="refreshStatus()">
+        <ion-icon name="refresh-outline"></ion-icon>
       </ion-button>
-
-      <!-- Bluetooth -->
-      <ion-button (click)="goToBluetoothSettings()" color="primary" fill="clear">
-        <ion-icon src="/assets/icon/bluetooth-outline.svg" class="bt-icon"></ion-icon>
+      <ion-button fill="clear" (click)="openConfigPage()">
+        <ion-icon name="settings-outline"></ion-icon>
       </ion-button>
-
-      <!-- Salir App -->
-      <ion-button (click)="exitApp()" fill="clear" color="danger">
-        <ion-icon src="/assets/icon/power-outline.svg"></ion-icon>
+      <ion-button fill="clear" (click)="goToBluetoothSettings()">
+        <ion-icon name="bluetooth-outline"></ion-icon>
       </ion-button>
-
-      <!-- Estado conexión -->
+      <ion-button fill="clear" color="danger" (click)="exitApp()">
+        <ion-icon name="power-outline"></ion-icon>
+      </ion-button>
       <ion-chip [color]="(isConnected$ | async) ? 'success' : 'danger'">
-        <ion-label>
-          {{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}
-        </ion-label>
+        <ion-icon [name]="(isConnected$ | async) ? 'bluetooth-outline' : 'close-circle-outline'"></ion-icon>
+        <ion-label>{{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}</ion-label>
       </ion-chip>
-
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-
-  <!-- Capturamos relayStats UNA sola vez para toda la página -->
+<ion-content class="dashboard-content">
   <ng-container *ngIf="relayStats$ | async as stats">
+    <main class="dashboard-root">
 
-    <div class="two-column-container">
 
-      <!-- ================= LEFT ================= -->
-      <div class="column panel-container">
-        <div class="panel-header header-with-toggle">
-          <span>Lado Izquierdo</span>
 
-          <ion-toggle
-            class="custom-toggle"
-            color="success"
-            [checked]="(enabledLeft$ | async) === true"
-            (ionChange)="onToggleLeft($event)">
-          </ion-toggle>
-        </div>
+      <section class="two-col">
+        <article class="panel">
+          <header class="panel-hdr green">
+            <div><ion-icon name="arrow-back-outline"></ion-icon><span>Lado izquierdo</span></div>
+            <ion-toggle class="custom-toggle"
+              [disabled]="!(isConnected$ | async)"
+              [checked]="(enabledLeft$ | async) === true"
+              (ionChange)="onToggleLeft($event)">
+            </ion-toggle>
+          </header>
 
-        <div class="panel-body">
-
-          <div class="info-block"
-               [ngClass]="{
-                 'active-spray': (relayLeft$ | async) === true,
-                 'inactive-spray': (relayLeft$ | async) === false
-               }">
-
-            <label>Distancia</label>
-
-            <div class="distance-row">
-              <div class="distance-value">
-                <ng-container *ngIf="distanceLeft$ | async as distLeft; else noLeft">
-                  {{ distLeft }} cm
-                </ng-container>
-                <ng-template #noLeft>--</ng-template>
+          <div class="panel-body" [class.disabled]="(enabledLeft$ | async) === false">
+            <div class="side-main" [class.active]="(relayLeft$ | async) === true">
+              <div>
+                <span class="eyebrow">{{ (sourceMode$ | async) === 1 ? 'Entrada PC817' : 'Distancia' }}</span>
+                <strong class="side-value">{{ sideValueText(sourceMode$ | async, distanceLeft$ | async, relayLeft$ | async) }}</strong>
               </div>
 
-              <div class="spray-icon-mini"
-                   [ngClass]="{
-                     'active': (relayLeft$ | async) === true,
-                     'hidden': (relayLeft$ | async) === false
-                   }">
-                <img src="assets/icon/spray_izda_transp.svg" />
+              <div class="spray-status" [class.on]="(relayLeft$ | async) === true">
+                <ion-icon name="water-outline"></ion-icon>
+                <span>{{ (relayLeft$ | async) === true ? 'Pulverizando' : 'Parado' }}</span>
+              </div>
+            </div>
+
+            <div class="side-stats">
+              <div class="stat-card">
+                <span>Tiempo activo <i *ngIf="(relayLeft$ | async) === true" class="live-dot"></i></span>
+                <strong [class.live]="(relayLeft$ | async) === true">{{ formatMsToMinSec(stats.L.timeMs) }}</strong>
+              </div>
+              <div class="stat-card">
+                <span>Activaciones</span>
+                <strong>{{ stats.L.activations }}</strong>
               </div>
             </div>
           </div>
+        </article>
 
-          <!-- Tiempo apertura -->
-          <div class="info-block">
-            <label>
-              Tiempo en Apertura
-              <span *ngIf="(relayLeft$ | async) === true" class="live-indicator">●</span>
-            </label>
+        <article class="panel">
+          <header class="panel-hdr green">
+            <div><ion-icon name="arrow-forward-outline"></ion-icon><span>Lado derecho</span></div>
+            <ion-toggle class="custom-toggle"
+              [disabled]="!(isConnected$ | async)"
+              [checked]="(enabledRight$ | async) === true"
+              (ionChange)="onToggleRight($event)">
+            </ion-toggle>
+          </header>
 
-            <div class="value" [class.live-value]="(relayLeft$ | async) === true">
-              {{ formatMsToMinSec(stats?.L?.timeMs) }}
-            </div>
-          </div>
-
-          <div class="info-block">
-            <label>Número de Aperturas</label>
-            <div class="value">
-              {{ stats?.L?.activations ?? 0 }}
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- ================= RIGHT ================= -->
-      <div class="column panel-container">
-        <div class="panel-header header-with-toggle">
-          <span>Lado Derecho</span>
-
-          <ion-toggle
-            class="custom-toggle"
-            color="success"
-            [checked]="(enabledRight$ | async) === true"
-            (ionChange)="onToggleRight($event)">
-          </ion-toggle>
-        </div>
-
-        <div class="panel-body">
-
-          <div class="info-block"
-               [ngClass]="{
-                 'active-spray': (relayRight$ | async) === true,
-                 'inactive-spray': (relayRight$ | async) === false
-               }">
-
-            <label>Distancia</label>
-
-            <div class="distance-row">
-              <div class="distance-value">
-                <ng-container *ngIf="distanceRight$ | async as distRight; else noRight">
-                  {{ distRight }} cm
-                </ng-container>
-                <ng-template #noRight>--</ng-template>
+          <div class="panel-body" [class.disabled]="(enabledRight$ | async) === false">
+            <div class="side-main" [class.active]="(relayRight$ | async) === true">
+              <div>
+                <span class="eyebrow">{{ (sourceMode$ | async) === 1 ? 'Entrada PC817' : 'Distancia' }}</span>
+                <strong class="side-value">{{ sideValueText(sourceMode$ | async, distanceRight$ | async, relayRight$ | async) }}</strong>
               </div>
 
-              <div class="spray-icon-mini"
-                   [ngClass]="{
-                     'active': (relayRight$ | async) === true,
-                     'hidden': (relayRight$ | async) === false
-                   }">
-                <img src="assets/icon/spray_dcha_transp.svg" />
+              <div class="spray-status" [class.on]="(relayRight$ | async) === true">
+                <ion-icon name="water-outline"></ion-icon>
+                <span>{{ (relayRight$ | async) === true ? 'Pulverizando' : 'Parado' }}</span>
+              </div>
+            </div>
+
+            <div class="side-stats">
+              <div class="stat-card">
+                <span>Tiempo activo <i *ngIf="(relayRight$ | async) === true" class="live-dot"></i></span>
+                <strong [class.live]="(relayRight$ | async) === true">{{ formatMsToMinSec(stats.R.timeMs) }}</strong>
+              </div>
+              <div class="stat-card">
+                <span>Activaciones</span>
+                <strong>{{ stats.R.activations }}</strong>
               </div>
             </div>
           </div>
+        </article>
+      </section>
 
-          <!-- Tiempo apertura -->
-          <div class="info-block">
-            <label>
-              Tiempo en Apertura
-              <span *ngIf="(relayRight$ | async) === true" class="live-indicator">●</span>
-            </label>
+      <section class="two-col">
+        <article class="panel">
+          <header class="panel-hdr blue">
+            <div><ion-icon name="water-outline"></ion-icon><span>Nivel del depósito</span></div>
+            <ion-chip [color]="(levelValid$ | async) ? ((depositoLow$ | async) ? 'danger' : 'success') : 'warning'">
+              <ion-label>{{ (levelValid$ | async) ? 'Lectura válida' : 'No fiable' }}</ion-label>
+            </ion-chip>
+          </header>
 
-            <div class="value" [class.live-value]="(relayRight$ | async) === true">
-              {{ formatMsToMinSec(stats?.R?.timeMs) }}
+          <div class="panel-body level-body" [class.invalid]="!(levelValid$ | async)">
+            <div class="tank-zone">
+              <div class="tank-shell">
+                <div class="segment green" [class.filled]="((levelPercent$ | async) ?? 0) >= 90"></div>
+                <div class="segment green" [class.filled]="((levelPercent$ | async) ?? 0) >= 80"></div>
+                <div class="segment green" [class.filled]="((levelPercent$ | async) ?? 0) >= 70"></div>
+                <div class="segment green" [class.filled]="((levelPercent$ | async) ?? 0) >= 60"></div>
+                <div class="segment green" [class.filled]="((levelPercent$ | async) ?? 0) >= 50"></div>
+                <div class="segment green" [class.filled]="((levelPercent$ | async) ?? 0) >= 40"></div>
+                <div class="segment yellow" [class.filled]="((levelPercent$ | async) ?? 0) >= 30"></div>
+                <div class="segment yellow" [class.filled]="((levelPercent$ | async) ?? 0) >= 20"></div>
+                <div class="segment red" [class.filled]="((levelPercent$ | async) ?? 0) >= 10"></div>
+                <div class="segment red" [class.filled]="((levelPercent$ | async) ?? 0) > 0"></div>
+
+                <div class="tank-value">
+                  <strong>{{ (levelPercent$ | async) ?? '--' }}%</strong>
+                  <span>{{ (depositoRestante$ | async) !== null ? ((depositoRestante$ | async) | number:'1.0-0') : '--' }} L</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="metrics">
+              <div class="metric-card"><span>Altura corregida</span><strong>{{ (levelMm$ | async) ?? '--' }} mm</strong></div>
+              <div class="metric-card"><span>Presión de nivel</span><strong>{{ (levelPressurePsi$ | async) ?? '--' }} psi</strong></div>
+              <div class="metric-card"><span>Inclinación</span><strong>{{ (tiltDeg$ | async) ?? '--' }}°</strong></div>
+              <div class="metric-card"><span>Consumido estimado</span><strong>{{ (depositoConsumido$ | async) !== null ? ((depositoConsumido$ | async) | number:'1.0-0') : '--' }} L</strong></div>
+
+              <div class="sensor-message ok" *ngIf="levelValid$ | async">
+                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                Nivel compensado y lectura fiable
+              </div>
+
+              <div class="sensor-message warn" *ngIf="!(levelValid$ | async)">
+                <ion-icon name="warning-outline"></ion-icon>
+                Lectura no fiable por inclinación, movimiento o fallo del sensor
+              </div>
             </div>
           </div>
+        </article>
 
-          <div class="info-block">
-            <label>Número de Aperturas</label>
-            <div class="value">
-              {{ stats?.R?.activations ?? 0 }}
+        <article class="panel" *ngIf="highPressureState$ | async as pressureState">
+          <header class="panel-hdr orange">
+            <div><ion-icon name="speedometer-outline"></ion-icon><span>Alta presión</span></div>
+            <ion-chip [color]="pressureState === 'lockout' || pressureState === 'sensor-fault' ? 'danger' : pressureState === 'ok' ? 'success' : 'medium'">
+              <ion-label>{{ highPressureStateText(pressureState) }}</ion-label>
+            </ion-chip>
+          </header>
+
+          <div class="panel-body pressure-body">
+            <div class="pressure-gauge">
+              <svg viewBox="0 0 100 100" fill="none">
+                <circle class="base" cx="50" cy="50" r="39" stroke-dasharray="184 61" stroke-dashoffset="-30.5"></circle>
+                <!-- 0–10 bar: rojo -->
+                <circle
+                  class="zone low"
+                  cx="50" cy="50" r="39"
+                  stroke-dasharray="46 199"
+                  stroke-dashoffset="-30.5">
+                </circle>
+
+                <!-- 10–30 bar: verde -->
+                <circle
+                  class="zone normal"
+                  cx="50" cy="50" r="39"
+                  stroke-dasharray="92 153"
+                  stroke-dashoffset="-76.5">
+                </circle>
+
+                <!-- 30–40 bar: rojo -->
+                <circle
+                  class="zone high"
+                  cx="50" cy="50" r="39"
+                  stroke-dasharray="46 199"
+                  stroke-dashoffset="-168.5">
+                </circle>
+                <circle class="value"
+                  cx="50" cy="50" r="31"
+                  [attr.stroke]="pressureGaugeColor$ | async"
+                  [attr.stroke-dasharray]="pressureGaugeDash$ | async"
+                  [class.anim-red]="pressureState === 'lockout' || pressureState === 'sensor-fault'"
+                  stroke-dashoffset="-24">
+                </circle>
+              </svg>
+
+              <div class="gauge-center">
+                <strong [class.ok]="pressureState === 'ok'" [class.danger]="pressureState === 'lockout' || pressureState === 'sensor-fault'">
+                  {{ (highPressureBar$ | async) ?? '--' }}
+                </strong>
+                <span>bar</span>
+                <small>{{ highPressureStateText(pressureState) }}</small>
+              </div>
+
+              <i class="gauge-min">0</i>
+              <i class="gauge-max">40</i>
+            </div>
+
+            <div class="pressure-info">
+              <div class="thresholds">
+                <div><span>Alarma mínima</span><strong>{{ highPressureResetBar$ | async }} bar</strong></div>
+                <div><span>Alarma máxima</span><strong>{{ highPressureAlarmBar$ | async }} bar</strong></div>
+                <div><span>Límite duro</span><strong>{{ highPressureHardLimitBar$ | async }} bar</strong></div>
+              </div>
+
+              <div class="legend">
+                <span><i class="dot low"></i>Baja</span>
+                <span><i class="dot normal"></i>Normal</span>
+                <span><i class="dot high"></i>Alta</span>
+                <span><i class="dot critical"></i>Bloqueo</span>
+              </div>
+
+              <div class="safety-alert" *ngIf="pressureState === 'lockout'">
+                <ion-icon name="lock-closed-outline"></ion-icon>
+                Salidas MOSFET bloqueadas por sobrepresión.
+              </div>
+
+              <div class="safety-alert" *ngIf="pressureState === 'sensor-fault'">
+                <ion-icon name="warning-outline"></ion-icon>
+                Fallo del sensor. El bloqueo permanece activo.
+              </div>
+
+              <button class="mute-btn"
+                *ngIf="pressureState === 'lockout' || pressureState === 'sensor-fault'"
+                (click)="toggleMute()">
+                <ion-icon [name]="muted ? 'volume-mute-outline' : 'volume-high-outline'"></ion-icon>
+                {{ muted ? 'Reactivar alarma' : 'Silenciar alarma' }}
+              </button>
             </div>
           </div>
+        </article>
+      </section>
 
-        </div>
-      </div>
 
-    </div>
-
-    <!-- ================= TOTAL ================= -->
-    <div class="total-container">
-
-      <div class="total-panel">
-        <span>Total Aplicado</span>
-
-        <strong>
-          <ng-container *ngIf="mode$ | async as mode; else modo0">
-
-            <!-- MODO 1 -->
-            <ng-container *ngIf="mode === 1; else modo0">
-              <ng-container *ngIf="grPerSec$ | async as grps">
-                {{
-                  (((stats?.L?.timeMs ?? 0) + (stats?.R?.timeMs ?? 0)) / 1000) * grps/1000
-                  | number:'1.2-2'
-                }} Kg
-                
-              </ng-container>
-            </ng-container>
-
-          </ng-container>
-
-          <!-- MODO 0 -->
-          <ng-template #modo0>
-            <ng-container *ngIf="litersPerMin$ | async as lpm">
-              <ng-container *ngIf="numApplicators$ | async as apps">
-                {{
-                  (((stats?.L?.timeMs ?? 0) + (stats?.R?.timeMs ?? 0)) / 1000)
-                  * (lpm * (apps || 1) / 60)
-                  | number:'1.2-2'
-                }}
-                L
-              </ng-container>
-            </ng-container>
-          </ng-template>
-
-        </strong>
-      </div>
-
-      <div class="reset-panel">
-
-        <ion-button
-          color="primary"
-          fill="solid"
-          (click)="bt.requestRelayStats()"
-          title="Forzar lectura inmediata de estadísticas">
-          <ion-icon slot="start" name="refresh-outline"></ion-icon>
-          Refrescar Stats
-        </ion-button>
-
-        <ion-button
-          color="danger"
-          fill="solid"
-          (click)="onResetStats()"
-          title="Poner a cero tiempo de apertura y número de aperturas">
-          <ion-icon slot="start" name="trash-outline"></ion-icon>
-          Reset Stats
-        </ion-button>
-
-      </div>
-
-    </div>
-
+    </main>
   </ng-container>
-
-  <!-- ================= AUTO UPDATE ================= -->
-  <div class="auto-update-info" *ngIf="isConnected$ | async">
-    <ion-chip color="success" outline="true">
-      <ion-icon name="sync-outline"></ion-icon>
-      <ion-label>Actualización automática cada 2s</ion-label>
-    </ion-chip>
-  </div>
-
 </ion-content>
