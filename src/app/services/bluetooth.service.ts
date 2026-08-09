@@ -37,6 +37,14 @@ interface QueuedCmd {
   payload?: Uint8Array;
   timeoutMs: number;
   priority: CmdPriority;
+  // Nº de intentos a forzar para ESTE comando, si difiere del que le tocaría
+  // por prioridad (ver runCmdWorker). Pensado para comandos 'high' donde el
+  // usuario espera respuesta casi inmediata (p.ej. activar/desactivar un
+  // lado): 3 intentos con el presupuesto normal de CMD_SET_ENABLE tardaban
+  // hasta ~8.5s en fallar del todo — demasiado para algo que se siente como
+  // un interruptor. Con esto se puede pedir menos intentos sin tocar el
+  // comportamiento (más tolerante a reintentos) del resto de comandos 'high'.
+  attempts?: number;
   resolve: () => void;
   reject: (e: any) => void;
 }
@@ -837,6 +845,7 @@ export class BluetoothService {
     payload?: Uint8Array,
     timeoutMs = 3000,
     priority: CmdPriority = 'high',
+    attempts?: number,
   ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       // Los comandos de fondo (sondeo periódico) son idempotentes: si ya hay
@@ -848,7 +857,7 @@ export class BluetoothService {
         return;
       }
 
-      const entry: QueuedCmd = { cmdType, payload, timeoutMs, priority, resolve, reject };
+      const entry: QueuedCmd = { cmdType, payload, timeoutMs, priority, attempts, resolve, reject };
 
       if (priority === 'high') {
         // Se cuela delante del primer comando de fondo pendiente (los 'high'
@@ -876,8 +885,10 @@ export class BluetoothService {
         // Los comandos de fondo no reintentan: si fallan, el propio sondeo
         // periódico volverá a pedirlo en el siguiente ciclo, y así un
         // comando de fondo bloquea la cola como mucho ~500ms en vez de
-        // hasta ~9.7s con reintentos.
-        const attempts = entry.priority === 'low' ? 1 : 3;
+        // hasta ~9.7s con reintentos. entry.attempts permite a un comando
+        // 'high' concreto pedir menos intentos que el resto (ver nota junto
+        // a QueuedCmd.attempts).
+        const attempts = entry.attempts ?? (entry.priority === 'low' ? 1 : 3);
         try {
           await this.sendCmdWithRetry(entry.cmdType, entry.payload, entry.timeoutMs, attempts);
           entry.resolve();
@@ -1593,7 +1604,19 @@ export class BluetoothService {
     pl[1] = enabled ? 1 : 0;
 
     try {
-      await this.sendCmd(this.CMD_SET_ENABLE, pl, 5000);
+      // Fix latencia percibida (2ª vuelta): con 2 intentos (1.5s+2s) el peor
+      // caso medido en el enlace real seguía en ~5s — mejor que los ~11s
+      // originales, pero no se siente "inmediato" para un interruptor.
+      // Comprobado en el enlace real de esta sesión: cuando un intento
+      // falla, el reintento CASI NUNCA rescata nada (el enlace no está
+      // perdiendo un frame suelto, está genuinamente sordo un rato) — así
+      // que ese 2º intento solo añadía ~2s de espera sin mejorar la tasa de
+      // éxito real. Un solo intento a 1.8s da el peor caso más bajo posible
+      // sin volver a caer en el problema ya visto con timeouts <1.5s
+      // (falsos timeouts en un enlace sano-pero-no-instantáneo). Si falla,
+      // el usuario vuelve a tocar el interruptor — más barato y se siente
+      // más responsivo que la app reintentando en silencio.
+      await this.sendCmd(this.CMD_SET_ENABLE, pl, 1800, 'high', 1);
       this.log('info', 'ENABLE', `CMD_SET_ENABLE ${side}=${enabled} — ACK OK`);
       // Fix: antes se guardaba en Preferences el valor optimista ANTES de
       // saber si el Arduino lo aplicó, y nunca se corregía si el comando
