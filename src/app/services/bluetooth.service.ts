@@ -59,7 +59,10 @@ interface QueuedCmd {
 // (reset/alarm/hardLimit). Exportada para que cualquier UI que valide estos
 // mismos umbrales (steppers, formularios) use exactamente el mismo valor y
 // nunca puedan desincronizarse si algún día cambia.
-export const HP_MIN_GAP_BAR = 0.1;
+// v15: el rango de alta presión pasó de 0-20 a 0-60 bar con incrementos de
+// 0.5 bar (antes 0.1) — el margen mínimo se sube a juego, para que dos
+// pasos consecutivos del stepper siempre lo cumplan de sobra.
+export const HP_MIN_GAP_BAR = 0.5;
 
 export type RelayStats = {
   L: { timeMs: number; activations: number };
@@ -182,6 +185,11 @@ export class BluetoothService {
   public highPressureSensorFault$ = new BehaviorSubject<boolean>(false);
   /** true = el Arduino ha cortado AMBAS salidas por sobrepresión (lockout activo). */
   public highPressureLockout$     = new BehaviorSubject<boolean>(false);
+  // v14: estado REAL de calibración del sensor de alta presión, persistido
+  // en la EEPROM del Arduino — igual patrón que levelCalibrated$/
+  // levelFullCalibrated$ (bits del byte añadido a EVT_HIGH_PRESSURE).
+  public highPressureZeroCalibrated$ = new BehaviorSubject<boolean>(false);
+  public highPressureRefCalibrated$  = new BehaviorSubject<boolean>(false);
 
   // Valores de umbral que la APP conoce/ha configurado. El protocolo actual
   // no tiene un comando de "leer configuración de alta presión", así que estos
@@ -288,6 +296,24 @@ export class BluetoothService {
   // v11: configura la geometría del depósito. Payload (4 bytes):
   // tankHeightMm(u16 LE), sensorLongitudinalOffsetMm(i16 LE, con signo).
   private readonly CMD_SET_TANK_GEOMETRY = 0x0C;
+  // v13: autocalibración de sensorLongitudinalOffsetMm por inclinación, en
+  // dos pasos, ninguno con payload. CMD_CALIBRATE_TILT_REF guarda la
+  // presión/ángulo de referencia (equipo nivelado, cualquier nivel de
+  // llenado); CMD_CALIBRATE_TILT_APPLY se manda después de inclinar el
+  // equipo (el ángulo lo mide el propio MPU, no hace falta indicarlo) y
+  // calcula+persiste la distancia. Ver nota completa junto a
+  // calibrateTiltReference() más abajo.
+  private readonly CMD_CALIBRATE_TILT_REF   = 0x0D;
+  private readonly CMD_CALIBRATE_TILT_APPLY = 0x0E;
+  // v14: calibración de 2 puntos del sensor de ALTA presión (línea/bomba).
+  // ZERO sin payload (sin presión aplicada); REF con payload de 2 bytes
+  // (refBar_x100, u16 LE) — la presión de referencia REAL que el usuario
+  // está aplicando en ese momento con una fuente externa conocida.
+  private readonly CMD_CALIBRATE_HIGH_PRESSURE_ZERO = 0x0F;
+  // 0x10-0x18 están reservados para EVT_* (ver más abajo) — se salta al
+  // primer hueco libre después del rango de eventos para no mezclar los dos
+  // rangos de numeración (ver nota idéntica en el .ino).
+  private readonly CMD_CALIBRATE_HIGH_PRESSURE_REF  = 0x19;
 
   private readonly EVT_BOOT      = 0x10;
   private readonly EVT_DIST      = 0x11;
@@ -480,14 +506,15 @@ export class BluetoothService {
         if (grps.value)  this.grPerSec$.next(Math.max(0, Math.round(Number(grps.value))));
 
         // v8: cargar umbrales de alta presion, validando la misma coherencia
-        // que setHighPressureConfig() (reset < alarm < hardLimit <= 20 bar).
+        // que setHighPressureConfig() (reset < alarm < hardLimit <= 60 bar,
+        // v15: antes 20).
         // Si lo guardado no es coherente (versión antigua, dato corrupto),
         // se ignoran los tres y se mantienen los valores por defecto.
         if (hpAlarm.value && hpReset.value && hpHard.value) {
           const a = Number(hpAlarm.value);
           const r = Number(hpReset.value);
           const h = Number(hpHard.value);
-          if (r >= 0 && (a - r) >= HP_MIN_GAP_BAR && (h - a) >= HP_MIN_GAP_BAR && h <= 20) {
+          if (r >= 0 && (a - r) >= HP_MIN_GAP_BAR && (h - a) >= HP_MIN_GAP_BAR && h <= 60) {
             this.highPressureAlarmBar$.next(a);
             this.highPressureResetBar$.next(r);
             this.highPressureHardLimitBar$.next(h);
@@ -1059,6 +1086,17 @@ export class BluetoothService {
     const zeroCalibrated = (calibBits & 0x01) !== 0;
     const fullCalibrated = (calibBits & 0x02) !== 0;
 
+    // v13: sensorLongitudinalOffsetMm (i16 LE con signo), 2 bytes añadidos al
+    // final tras el bitmask de calibración — extensión retrocompatible: un
+    // firmware anterior a v13 simplemente no manda estos 2 bytes, el guard de
+    // longitud lo detecta y se deja sensorLongitudinalOffsetMm$ como estaba
+    // (el último valor conocido/por defecto), igual que ya pasaba con toda
+    // la geometría del depósito antes de existir un comando de lectura.
+    const haveTiltOffset = payload.length >= offset + 9;
+    const tiltOffsetMm = haveTiltOffset
+      ? ((this.u16LE(payload, offset + 7) << 16) >> 16) // reinterpretar u16 como i16 con signo
+      : null;
+
     this.zone.run(() => {
       this.levelMm$.next(levelMm);
       this.levelPressurePsi$.next(pressurePsi);
@@ -1066,6 +1104,7 @@ export class BluetoothService {
       this.levelValid$.next(valid);
       this.levelCalibrated$.next(zeroCalibrated);
       this.levelFullCalibrated$.next(fullCalibrated);
+      if (tiltOffsetMm !== null) this.sensorLongitudinalOffsetMm$.next(tiltOffsetMm);
     });
 
     return true;
@@ -1081,11 +1120,20 @@ export class BluetoothService {
     const bar         = this.u16LE(payload, 0) / 100.0;
     const sensorFault = payload[2] === 1;
     const lockout     = payload[3] === 1;
+    // v14: byte 5 añadido al final (retrocompatible, igual patrón que la
+    // extensión de nivel): bit0 = cero calibrado, bit1 = referencia
+    // calibrada. Un firmware anterior a v14 simplemente no lo manda.
+    const haveCalibBits = payload.length >= 5;
+    const calibBits = haveCalibBits ? payload[4] : 0;
 
     this.zone.run(() => {
       this.highPressureBar$.next(bar);
       this.highPressureSensorFault$.next(sensorFault);
       this.highPressureLockout$.next(lockout);
+      if (haveCalibBits) {
+        this.highPressureZeroCalibrated$.next((calibBits & 0x01) !== 0);
+        this.highPressureRefCalibrated$.next((calibBits & 0x02) !== 0);
+      }
     });
 
     return true;
@@ -1355,12 +1403,23 @@ export class BluetoothService {
   requestRelayStats()  { return this.sendCmd(this.CMD_GET_RELAYSTAT, undefined, 3000, 'low'); }
   ping()               { return this.sendCmd(this.CMD_PING, undefined, 3000, 'low'); }
 
-  async resetRelayStats(): Promise<void> {
-    await this.sendCmd(this.CMD_RESET_RELAYSTAT);
+  /**
+   * v15: `side` opcional — sin indicarlo, reinicia los dos lados a la vez
+   * (comportamiento de siempre, payload vacío). Con 'L' o 'R', reinicia
+   * solo ese lado (payload de 1 byte con el carácter del lado) — requiere
+   * firmware v15+; en un firmware anterior el comando se rechazaría con
+   * BAD_VALUE al no reconocer el payload de 1 byte.
+   */
+  async resetRelayStats(side?: 'L' | 'R'): Promise<void> {
+    const pl = side ? new Uint8Array([side.charCodeAt(0)]) : undefined;
+    await this.sendCmd(this.CMD_RESET_RELAYSTAT, pl);
     this.zone.run(() => {
-      this.relayLeftTimeMs$.next(0);   this.relayLeftActivations$.next(0);
-      this.relayRightTimeMs$.next(0);  this.relayRightActivations$.next(0);
-      this.relayStats$.next({ L: { timeMs: 0, activations: 0 }, R: { timeMs: 0, activations: 0 } });
+      if (!side || side === 'L') { this.relayLeftTimeMs$.next(0);  this.relayLeftActivations$.next(0); }
+      if (!side || side === 'R') { this.relayRightTimeMs$.next(0); this.relayRightActivations$.next(0); }
+      this.relayStats$.next({
+        L: { timeMs: this.relayLeftTimeMs$.value,  activations: this.relayLeftActivations$.value },
+        R: { timeMs: this.relayRightTimeMs$.value, activations: this.relayRightActivations$.value },
+      });
     });
   }
 
@@ -1415,12 +1474,13 @@ export class BluetoothService {
   /**
    * v8: configura los umbrales de seguridad de alta presión en el Arduino
    * (CMD_SET_HIGH_PRESSURE_CONFIG, 0x0A) y los persiste en su EEPROM.
-   * Debe cumplirse: 0 <= resetBar < alarmBar < hardLimitBar <= 20 bar
-   * (20 bar es el fondo de escala físico del sensor, HIGH_PRESSURE_MAX_BAR
-   * en el firmware; ajustar aquí si el sensor real tiene otro rango).
+   * Debe cumplirse: 0 <= resetBar < alarmBar < hardLimitBar <= 60 bar
+   * (v15: antes 20 — 60 bar es el fondo de escala físico del sensor,
+   * HIGH_PRESSURE_MAX_BAR en el firmware; ajustar aquí si el sensor real
+   * tiene otro rango).
    */
   async setHighPressureConfig(alarmBar: number, resetBar: number, hardLimitBar: number): Promise<void> {
-    const SENSOR_MAX_BAR = 20; // debe coincidir con HIGH_PRESSURE_MAX_BAR del firmware
+    const SENSOR_MAX_BAR = 60; // debe coincidir con HIGH_PRESSURE_MAX_BAR del firmware
     // v8: se exige un margen mínimo real (HP_MIN_GAP_BAR) entre los tres
     // umbrales, no solo una desigualdad estricta matemática — antes,
     // resetBar=15.999 y alarmBar=16.0 pasaban la validación pese a no tener
@@ -1458,6 +1518,42 @@ export class BluetoothService {
     await this.saveConfigToPreferences().catch(e =>
       this.log('warn', 'CONFIG', 'No se pudo persistir la config de alta presión', e)
     );
+  }
+
+  /**
+   * v14: paso 1 de la calibración del sensor de ALTA presión (línea/bomba,
+   * CMD_CALIBRATE_HIGH_PRESSURE_ZERO, 0x0F). Requiere el sensor a presión
+   * atmosférica (sin ninguna presión aplicada) en el momento de calibrar.
+   * Invalida en el firmware cualquier referencia (span) calibrada antes,
+   * porque ya no sería coherente con este cero nuevo — hay que recalibrar
+   * también el paso 2 tras esto.
+   */
+  async calibrateHighPressureZero(): Promise<void> {
+    await this.sendCmd(this.CMD_CALIBRATE_HIGH_PRESSURE_ZERO, undefined, 3000);
+    this.zone.run(() => {
+      this.highPressureZeroCalibrated$.next(true);
+      this.highPressureRefCalibrated$.next(false);
+    });
+  }
+
+  /**
+   * v14: paso 2 (CMD_CALIBRATE_HIGH_PRESSURE_REF, 0x19). Se manda con una
+   * presión de referencia REAL aplicada en ese momento (bomba de mano,
+   * manómetro patrón, etc.) — `refBar` es el valor de esa presión conocida,
+   * lo aporta el usuario, el firmware no lo puede medir por su cuenta.
+   * Requiere haber calibrado antes el cero (paso 1).
+   */
+  async calibrateHighPressureRef(refBar: number): Promise<void> {
+    if (!(refBar > 0 && refBar <= 60)) {
+      throw new Error('BAD_VALUE: la presión de referencia debe estar entre 0 y 60 bar');
+    }
+    const refBarX100 = Math.round(refBar * 100);
+    const pl = new Uint8Array(2);
+    pl[0] = refBarX100 & 0xFF;
+    pl[1] = (refBarX100 >> 8) & 0xFF;
+
+    await this.sendCmd(this.CMD_CALIBRATE_HIGH_PRESSURE_REF, pl, 3000);
+    this.zone.run(() => this.highPressureRefCalibrated$.next(true));
   }
 
   /**
@@ -1519,6 +1615,58 @@ export class BluetoothService {
     await this.saveConfigToPreferences().catch(e =>
       this.log('warn', 'CONFIG', 'No se pudo persistir la geometría del depósito', e)
     );
+  }
+
+  /**
+   * v13: true entre calibrateTiltReference() y calibrateTiltApply() — solo
+   * para que la UI sepa en qué paso está (p.ej. mostrar "ahora inclina el
+   * equipo y pulsa Calcular"). Es un espejo optimista del flag equivalente
+   * en el firmware (tiltCalRefCaptured); no hay forma de leer ese flag del
+   * Arduino directamente, así que si la app se reinicia a mitad del
+   * procedimiento este flag vuelve a false aunque el firmware siga
+   * recordando la referencia — sin problema real, el firmware la sigue
+   * aceptando, solo que la UI pediría repetir el paso 1 innecesariamente.
+   */
+  public tiltCalRefCaptured$ = new BehaviorSubject<boolean>(false);
+
+  /**
+   * v13: paso 1 de la autocalibración de sensorLongitudinalOffsetMm por
+   * inclinación (CMD_CALIBRATE_TILT_REF, 0x0D). Requiere: calibración de
+   * vacío+lleno ya hecha (el firmware necesita el gradiente presión/mm para
+   * el paso 2) y equipo nivelado y quieto — el firmware rechaza con
+   * BAD_VALUE si el MPU no está estable. El nivel de llenado en este
+   * momento da igual (cualquiera vale), pero NO debe cambiar hasta terminar
+   * el paso 2 — la resta de las dos lecturas asume el mismo volumen.
+   */
+  async calibrateTiltReference(): Promise<void> {
+    await this.sendCmd(this.CMD_CALIBRATE_TILT_REF, undefined, 3000);
+    this.zone.run(() => this.tiltCalRefCaptured$.next(true));
+  }
+
+  /**
+   * v13: paso 2 (CMD_CALIBRATE_TILT_APPLY, 0x0E). Se manda tras inclinar el
+   * equipo una cantidad cualquiera respecto a la postura del paso 1 (el
+   * ángulo lo mide el MPU, no se manda por protocolo) y sin haber cambiado
+   * el volumen de líquido entre medias. El firmware calcula la distancia
+   * del sensor al eje de basculamiento y la persiste en su EEPROM como
+   * sensorLongitudinalOffsetMm — el valor resultante llega de vuelta en el
+   * siguiente EVT_STATUS/EVT_SNAPSHOT (ver decodeLevelStatusExtension), por
+   * eso aquí se refresca con requestStatus() en vez de fiarse de un valor
+   * calculado también en el cliente (evita que difieran app/firmware por
+   * redondeos).
+   */
+  async calibrateTiltApply(): Promise<void> {
+    // Nota: si esto lanza (p.ej. BAD_VALUE por inclinación insuficiente
+    // respecto al paso 1), el firmware CONSERVA la referencia y permite
+    // reintentar el paso 2 con más inclinación sin repetir el paso 1 — así
+    // que tiltCalRefCaptured$ debe seguir en `true` en ese caso; solo se
+    // pone a `false` tras un éxito real, dejando que el catch del llamador
+    // (la UI) decida qué mensaje mostrar sin perder el progreso del paso 1.
+    await this.sendCmd(this.CMD_CALIBRATE_TILT_APPLY, undefined, 3000);
+    this.zone.run(() => this.tiltCalRefCaptured$.next(false));
+    await this.requestStatus().catch(error => {
+      this.log('warn', 'CALIBRATION', 'No se pudo refrescar el estado tras calibrar inclinación', error);
+    });
   }
 
   applyConfig(): Promise<void> {

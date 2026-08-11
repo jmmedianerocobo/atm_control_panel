@@ -18,6 +18,7 @@ import {
   IonLabel,
   IonButton,
   IonIcon,
+  AlertController,
 } from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
@@ -35,6 +36,7 @@ import {
   checkmarkCircleOutline,
   lockClosedOutline,
   analyticsOutline,
+  trashOutline,
 } from 'ionicons/icons';
 
 import { BluetoothService } from '../services/bluetooth.service';
@@ -193,9 +195,13 @@ export class DistanceViewPage implements OnInit, OnDestroy {
   private togglingRight = false;
   private statsInterval: ReturnType<typeof setInterval> | null = null;
 
+  resettingStatsLeft = false;
+  resettingStatsRight = false;
+
   constructor(
     private router: Router,
     public bt: BluetoothService,
+    private alertController: AlertController,
   ) {
     addIcons({
       'settings-outline': settingsOutline,
@@ -211,6 +217,7 @@ export class DistanceViewPage implements OnInit, OnDestroy {
       'checkmark-circle-outline': checkmarkCircleOutline,
       'lock-closed-outline': lockClosedOutline,
       'analytics-outline': analyticsOutline,
+      'trash-outline': trashOutline,
     });
   }
 
@@ -384,6 +391,43 @@ export class DistanceViewPage implements OnInit, OnDestroy {
         console.error('requestRelayStats:', error);
       }),
     ]);
+  }
+
+  /**
+   * Reinicia tiempo activo y activaciones de UN solo lado (v15: el
+   * protocolo CMD_RESET_RELAYSTAT admite ahora un payload opcional de 1
+   * byte con el lado, ver resetOutputStatsSide() en el .ino; sin payload
+   * sigue reseteando los dos, comportamiento que ya no se usa desde la UI).
+   * Se pide confirmación porque es una acción que pierde el histórico
+   * acumulado sin posibilidad de deshacerla.
+   */
+  async confirmResetStats(side: 'L' | 'R'): Promise<void> {
+    if (!this.bt.isConnected$.value) return;
+
+    const ladoTexto = side === 'L' ? 'izquierdo' : 'derecho';
+    const alert = await this.alertController.create({
+      header: 'Reiniciar contadores',
+      message: `Se pondrán a cero el tiempo activo y las activaciones del lado ${ladoTexto}. No se puede deshacer.`,
+      backdropDismiss: false,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Reiniciar', role: 'confirm', handler: () => void this.runResetStats(side) },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async runResetStats(side: 'L' | 'R'): Promise<void> {
+    const busy = side === 'L' ? 'resettingStatsLeft' : 'resettingStatsRight';
+    if (this[busy]) return;
+    this[busy] = true;
+    try {
+      await this.bt.resetRelayStats(side);
+    } catch (error) {
+      console.error('resetRelayStats:', error);
+    } finally {
+      this[busy] = false;
+    }
   }
 
   async onToggleLeft(event: any): Promise<void> {

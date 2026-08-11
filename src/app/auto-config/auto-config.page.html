@@ -256,31 +256,37 @@
             </div>
           </div>
 
-          <div class="sensor-position">
-            <div class="sensor-position-title">
-              <ion-icon name="locate-outline"></ion-icon>
-              Posición del sensor
+          <!-- v15: aquí vivían los mm de "Posición del sensor" a mano; ya no
+               hace falta (se calcula sola con "Inclinación") — en su lugar,
+               las 3 calibraciones de nivel/geometría, agrupadas con lo que
+               configuran temáticamente. -->
+          <div class="cal-mini-list">
+            <div class="cal-mini-row" [class.done]="levelCalibrated$ | async">
+              <span>Vacío</span>
+              <ion-button
+                fill="solid" color="primary" size="small"
+                [disabled]="calibrating || !(bt.isConnected$ | async)"
+                (click)="confirmLevelCalibration()">
+                {{ calibrating ? '…' : ((levelCalibrated$ | async) ? '↻' : 'Calibrar') }}
+              </ion-button>
             </div>
-
-            <div class="sensor-param">
-              <span>Longitudinal</span>
-              <div class="stepper">
-                <button class="step-btn" type="button" (click)="step('sensorLongitudinalMm', -10)">
-                  <ion-icon name="chevron-down-outline"></ion-icon>
-                </button>
-                <strong>{{ sensorLongitudinalMm }} mm</strong>
-                <button class="step-btn" type="button" (click)="step('sensorLongitudinalMm', 10)">
-                  <ion-icon name="chevron-up-outline"></ion-icon>
-                </button>
-              </div>
-              <small>Distancia al centro; + = sensor por delante</small>
+            <div class="cal-mini-row" [class.done]="levelFullCalibrated$ | async">
+              <span>Lleno</span>
+              <ion-button
+                fill="solid" color="primary" size="small"
+                [disabled]="calibratingFull || !(levelCalibrated$ | async) || !(bt.isConnected$ | async)"
+                (click)="confirmFullLevelCalibration()">
+                {{ calibratingFull ? '…' : ((levelFullCalibrated$ | async) ? '↻' : 'Calibrar') }}
+              </ion-button>
             </div>
-
-            <div class="info-note teal-note">
-              <ion-icon name="warning-outline"></ion-icon>
-              Con el acelerómetro, esta posición compensa el cambio de presión
-              que provoca la inclinación, para que el nivel no varíe solo
-              porque el líquido se desplaza hacia el sensor.
+            <div class="cal-mini-row" [class.done]="tiltCalRefCaptured$ | async">
+              <span>Inclinación ({{ sensorLongitudinalMm$ | async }}mm)</span>
+              <ion-button
+                fill="solid" color="primary" size="small"
+                [disabled]="calibratingTiltRef || calibratingTiltApply || !(levelCalibrated$ | async) || !(levelFullCalibrated$ | async) || !(bt.isConnected$ | async)"
+                (click)="runTiltCalibrationStep()">
+                {{ (calibratingTiltRef || calibratingTiltApply) ? '…' : ((tiltCalRefCaptured$ | async) ? 'Calcular' : 'Calibrar') }}
+              </ion-button>
             </div>
           </div>
         </div>
@@ -310,11 +316,11 @@
                 <small>Restablece la alarma</small>
               </div>
               <div class="stepper">
-                <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', -0.1)">
+                <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', -0.5)">
                   <ion-icon name="chevron-down-outline"></ion-icon>
                 </button>
                 <strong>{{ pressureLowLimitBar | number:'1.1-1' }} bar</strong>
-                <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', 0.1)">
+                <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', 0.5)">
                   <ion-icon name="chevron-up-outline"></ion-icon>
                 </button>
               </div>
@@ -326,11 +332,11 @@
                 <small>Dispara la alarma</small>
               </div>
               <div class="stepper">
-                <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', -0.1)">
+                <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', -0.5)">
                   <ion-icon name="chevron-down-outline"></ion-icon>
                 </button>
                 <strong>{{ pressureHighLimitBar | number:'1.1-1' }} bar</strong>
-                <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', 0.1)">
+                <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', 0.5)">
                   <ion-icon name="chevron-up-outline"></ion-icon>
                 </button>
               </div>
@@ -349,62 +355,33 @@
                 <span>{{ pressureSensorMaxBar | number:'1.0-0' }} bar</span>
               </div>
             </div>
+
+            <!-- v15: calibraciones de alta presión, agrupadas aquí por tema
+                 en vez de en una barra aparte. -->
+            <div class="cal-mini-list">
+              <div class="cal-mini-row" [class.done]="highPressureZeroCalibrated$ | async">
+                <span>Presión cero</span>
+                <ion-button
+                  fill="solid" color="primary" size="small"
+                  [disabled]="calibratingHpZero || !(bt.isConnected$ | async)"
+                  (click)="confirmHpZeroCalibration()">
+                  {{ calibratingHpZero ? '…' : ((highPressureZeroCalibrated$ | async) ? '↻' : 'Calibrar') }}
+                </ion-button>
+              </div>
+              <div class="cal-mini-row" [class.done]="highPressureRefCalibrated$ | async">
+                <span>Presión ref.</span>
+                <ion-button
+                  fill="solid" color="primary" size="small"
+                  [disabled]="calibratingHpRef || !(highPressureZeroCalibrated$ | async) || !(bt.isConnected$ | async)"
+                  (click)="confirmHpRefCalibration()">
+                  {{ calibratingHpRef ? '…' : ((highPressureRefCalibrated$ | async) ? '↻' : 'Calibrar') }}
+                </ion-button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </article>
-  </div>
-
-  <!-- =============== CALIBRACIÓN DE NIVEL =============== -->
-  <div class="calibration-wizard">
-    <div class="calibration-wizard-header">
-      <div><ion-icon name="sync-outline"></ion-icon><span>Calibración de nivel</span></div>
-      <small>2 puntos: vacío y lleno</small>
-    </div>
-
-    <div class="calibration-steps">
-      <div class="calibration-step" [class.completed]="levelCalibrated$ | async">
-        <div class="step-copy">
-          <strong>1. Vacío — cero de presión + plano MPU6050</strong>
-          <span>Confirma depósito vacío y equipo inmóvil antes de calibrar</span>
-        </div>
-
-        <ion-chip [color]="(levelCalibrated$ | async) ? 'success' : 'medium'">
-          <ion-icon [name]="(levelCalibrated$ | async) ? 'checkmark-circle-outline' : 'warning-outline'"></ion-icon>
-          <ion-label>{{ (levelCalibrated$ | async) ? 'Calibrado' : 'Pendiente' }}</ion-label>
-        </ion-chip>
-
-        <ion-button
-          class="calibration-action"
-          fill="solid"
-          color="primary"
-          [disabled]="calibrating || !(bt.isConnected$ | async)"
-          (click)="confirmLevelCalibration()">
-          {{ calibrating ? 'Calibrando…' : 'Calibrar vacío' }}
-        </ion-button>
-      </div>
-
-      <div class="calibration-step" [class.completed]="levelFullCalibrated$ | async">
-        <div class="step-copy">
-          <strong>2. Lleno — presión de referencia</strong>
-          <span>Confirma depósito lleno y equipo detenido antes de calibrar</span>
-        </div>
-
-        <ion-chip [color]="(levelFullCalibrated$ | async) ? 'success' : 'medium'">
-          <ion-icon [name]="(levelFullCalibrated$ | async) ? 'checkmark-circle-outline' : 'warning-outline'"></ion-icon>
-          <ion-label>{{ (levelFullCalibrated$ | async) ? 'Calibrado' : 'Pendiente' }}</ion-label>
-        </ion-chip>
-
-        <ion-button
-          class="calibration-action"
-          fill="solid"
-          color="primary"
-          [disabled]="calibratingFull || !(levelCalibrated$ | async) || !(bt.isConnected$ | async)"
-          (click)="confirmFullLevelCalibration()">
-          {{ calibratingFull ? 'Calibrando…' : 'Calibrar lleno' }}
-        </ion-button>
-      </div>
-    </div>
   </div>
 
 </ion-content>

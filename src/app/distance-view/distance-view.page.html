@@ -45,11 +45,18 @@
         <article class="panel">
           <header class="panel-hdr green">
             <div><ion-icon name="arrow-back-outline"></ion-icon><span>Lado izquierdo</span></div>
-            <ion-toggle class="custom-toggle"
-              [disabled]="!(isConnected$ | async)"
-              [checked]="(enabledLeft$ | async) === true"
-              (ionChange)="onToggleLeft($event)">
-            </ion-toggle>
+            <div class="panel-hdr-actions">
+              <ion-button fill="clear" size="small" color="warning"
+                [disabled]="resettingStatsLeft || !(isConnected$ | async)"
+                (click)="confirmResetStats('L')">
+                <ion-icon name="trash-outline"></ion-icon>
+              </ion-button>
+              <ion-toggle class="custom-toggle"
+                [disabled]="!(isConnected$ | async)"
+                [checked]="(enabledLeft$ | async) === true"
+                (ionChange)="onToggleLeft($event)">
+              </ion-toggle>
+            </div>
           </header>
 
           <div class="panel-body" [class.disabled]="(enabledLeft$ | async) === false">
@@ -81,11 +88,18 @@
         <article class="panel">
           <header class="panel-hdr green">
             <div><ion-icon name="arrow-forward-outline"></ion-icon><span>Lado derecho</span></div>
-            <ion-toggle class="custom-toggle"
-              [disabled]="!(isConnected$ | async)"
-              [checked]="(enabledRight$ | async) === true"
-              (ionChange)="onToggleRight($event)">
-            </ion-toggle>
+            <div class="panel-hdr-actions">
+              <ion-button fill="clear" size="small" color="warning"
+                [disabled]="resettingStatsRight || !(isConnected$ | async)"
+                (click)="confirmResetStats('R')">
+                <ion-icon name="trash-outline"></ion-icon>
+              </ion-button>
+              <ion-toggle class="custom-toggle"
+                [disabled]="!(isConnected$ | async)"
+                [checked]="(enabledRight$ | async) === true"
+                (ionChange)="onToggleRight($event)">
+              </ion-toggle>
+            </div>
           </header>
 
           <div class="panel-body" [class.disabled]="(enabledRight$ | async) === false">

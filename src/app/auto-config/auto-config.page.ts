@@ -70,7 +70,12 @@ export class AutoConfigPage {
   // que nunca llegaban al firmware y no participan en el cálculo real.
   depositoCap           = 2000;
   tankHeightMm           = 300;
-  sensorLongitudinalMm   = 800;
+  // v14: ya no es editable a mano (ver "Calibrar inclinación" más abajo) —
+  // se muestra en modo solo-lectura leyendo directamente el valor real
+  // confirmado por el firmware, en vez de un campo local que había que
+  // mantener sincronizado. Sigue siendo lo que se manda en setTankGeometry()
+  // al aplicar (junto con tankHeightMm, que sí es editable).
+  sensorLongitudinalMm$ = this.bt.sensorLongitudinalOffsetMm$;
 
   // v11: el fondo de escala real del sensor de alta presión es 20 bar
   // (HIGH_PRESSURE_MAX_BAR en el firmware), no 40. El límite superior que
@@ -80,7 +85,7 @@ export class AutoConfigPage {
   // pedirle ese tercer valor al usuario: se deriva automáticamente como
   // alarma + HARD_LIMIT_MARGIN_BAR (mismo margen que usa el firmware entre
   // sus valores por defecto: 18 → 19.5 bar).
-  readonly pressureSensorMaxBar  = 20.0;
+  readonly pressureSensorMaxBar  = 60.0;
   readonly HARD_LIMIT_MARGIN_BAR = 1.5;
 
   pressureLowLimitBar  = 16.0;
@@ -100,15 +105,27 @@ export class AutoConfigPage {
   saving           = false;
   calibrating      = false;
   calibratingFull  = false;
+  calibratingTiltRef   = false;
+  calibratingTiltApply = false;
+  calibratingHpZero = false;
+  calibratingHpRef  = false;
 
   // v10 (opción A): CMD_CALIBRATE_LEVEL calibra a la vez el cero de presión
   // (depósito vacío) y el plano del MPU6050.
   levelCalibrated$ = this.bt.levelCalibrated$;
 
+  // v13: autocalibración de sensorLongitudinalOffsetMm por inclinación —
+  // true entre el paso 1 (referencia) y el paso 2 (inclinado).
+  tiltCalRefCaptured$ = this.bt.tiltCalRefCaptured$;
+
   // v11: segundo punto de calibración (depósito lleno). Con ambos puntos el
   // firmware calcula el nivel por interpolación de presiones en vez de
   // asumir la densidad del líquido — ver CMD_CALIBRATE_LEVEL_FULL.
   levelFullCalibrated$ = this.bt.levelFullCalibrated$;
+
+  // v14: calibración de 2 puntos del sensor de ALTA presión (línea/bomba).
+  highPressureZeroCalibrated$ = this.bt.highPressureZeroCalibrated$;
+  highPressureRefCalibrated$  = this.bt.highPressureRefCalibrated$;
 
   constructor(
     public bt: BluetoothService,
@@ -150,7 +167,6 @@ export class AutoConfigPage {
     // quien realmente los envía al firmware (y recuerda el último valor
     // establecido, ver nota en highPressureAlarmBar$ del servicio).
     this.tankHeightMm         = this.bt.tankHeightMm$.value;
-    this.sensorLongitudinalMm = this.bt.sensorLongitudinalOffsetMm$.value;
     this.pressureLowLimitBar  = this.round1(this.bt.highPressureResetBar$.value);
     this.pressureHighLimitBar = this.round1(this.bt.highPressureAlarmBar$.value);
 
@@ -202,9 +218,6 @@ export class AutoConfigPage {
       case 'tankHeightMm':
         // Límites de cordura física, iguales a los que valida el firmware.
         (this as any)[param] = Math.max(100, Math.min(5000, Math.round(newValue)));
-        break;
-      case 'sensorLongitudinalMm':
-        (this as any)[param] = Math.max(-5000, Math.min(5000, Math.round(newValue)));
         break;
 
       case 'pressureLowLimitBar': {
@@ -258,8 +271,6 @@ export class AutoConfigPage {
       return 'La capacidad debe estar entre 1 y 10000 litros';
     if (this.tankHeightMm < 100 || this.tankHeightMm > 5000)
       return 'La altura del depósito debe estar entre 100 y 5000 mm';
-    if (Math.abs(this.sensorLongitudinalMm) > 5000)
-      return 'La posición del sensor debe estar entre -5000 y 5000 mm';
 
     const derivedHardLimit = Math.min(
       this.pressureSensorMaxBar,
@@ -304,7 +315,7 @@ export class AutoConfigPage {
       }
 
       try {
-        await this.bt.setTankGeometry(this.tankHeightMm, this.sensorLongitudinalMm);
+        await this.bt.setTankGeometry(this.tankHeightMm, this.bt.sensorLongitudinalOffsetMm$.value);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(`No se pudo aplicar la geometría del depósito: ${msg}`);
@@ -430,6 +441,225 @@ export class AutoConfigPage {
       this.showErrorToast = true;
     } finally {
       this.calibratingFull = false;
+    }
+  }
+
+  // ── Autocalibración de la posición del sensor por inclinación ───
+  /**
+   * v13: paso 1. Requiere vacío+lleno ya calibrados (el firmware necesita
+   * el gradiente presión/mm) y equipo nivelado y quieto — cualquier nivel
+   * de llenado vale, pero no debe cambiar hasta terminar el paso 2.
+   */
+  async confirmTiltReferenceCalibration(): Promise<void> {
+    if (!this.bt.isConnected$.value) {
+      this.errorMessage = 'Conecta primero el dispositivo Bluetooth';
+      this.showErrorToast = true;
+      return;
+    }
+    if (!this.bt.levelCalibrated$.value || !this.bt.levelFullCalibrated$.value) {
+      this.errorMessage = 'Calibra primero el nivel vacío y lleno';
+      this.showErrorToast = true;
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Calibrar posición del sensor — paso 1',
+      message:
+        'Deja el equipo nivelado y quieto, con cualquier cantidad de líquido ' +
+        '(no hace falta que esté vacío ni lleno). A partir de aquí no añadas ni ' +
+        'quites líquido hasta terminar el paso 2.',
+      backdropDismiss: false,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Capturar referencia', role: 'confirm', handler: () => void this.runTiltReferenceCalibration() },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async runTiltReferenceCalibration(): Promise<void> {
+    if (this.calibratingTiltRef) return;
+    this.calibratingTiltRef = true;
+
+    try {
+      await this.bt.calibrateTiltReference();
+      this.successMessage = 'Referencia capturada — ahora inclina el equipo y pulsa "Calcular distancia"';
+      this.showSuccessToast = true;
+    } catch (err) {
+      this.errorMessage = err instanceof Error ? err.message : String(err);
+      this.showErrorToast = true;
+    } finally {
+      this.calibratingTiltRef = false;
+    }
+  }
+
+  /**
+   * v13: paso 2. Se manda tras inclinar el equipo (cualquier ángulo notable,
+   * lo mide el MPU) sin haber cambiado el volumen de líquido desde el paso
+   * 1. Si el ángulo alcanzado es insuficiente el firmware devuelve
+   * BAD_VALUE y conserva la referencia — se puede reintentar inclinando más
+   * sin repetir el paso 1.
+   */
+  async confirmTiltApplyCalibration(): Promise<void> {
+    if (!this.bt.isConnected$.value) {
+      this.errorMessage = 'Conecta primero el dispositivo Bluetooth';
+      this.showErrorToast = true;
+      return;
+    }
+    if (!this.bt.tiltCalRefCaptured$.value) {
+      this.errorMessage = 'Captura primero la referencia (paso 1)';
+      this.showErrorToast = true;
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Calibrar posición del sensor — paso 2',
+      message:
+        'Confirma que el equipo está ahora claramente inclinado respecto al paso 1 ' +
+        '(no hace falta un ángulo concreto) y quieto, sin haber añadido ni quitado ' +
+        'líquido. Se calculará y guardará la distancia del sensor al eje de basculamiento.',
+      backdropDismiss: false,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Calcular distancia', role: 'confirm', handler: () => void this.runTiltApplyCalibration() },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async runTiltApplyCalibration(): Promise<void> {
+    if (this.calibratingTiltApply) return;
+    this.calibratingTiltApply = true;
+
+    try {
+      await this.bt.calibrateTiltApply();
+      this.successMessage = `Distancia calculada y guardada: ${this.bt.sensorLongitudinalOffsetMm$.value} mm`;
+      this.showSuccessToast = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.errorMessage = msg.includes('BAD_VALUE')
+        ? 'Inclinación insuficiente respecto al paso 1 — inclina más y vuelve a pulsar "Calcular distancia"'
+        : msg;
+      this.showErrorToast = true;
+    } finally {
+      this.calibratingTiltApply = false;
+    }
+  }
+
+  /**
+   * Un solo botón para los dos pasos de la calibración por inclinación: se
+   * llama siempre a este único método, y él decide internamente si toca
+   * capturar la referencia (paso 1) o calcular (paso 2) según
+   * tiltCalRefCaptured$ — así el usuario ve un único bloque en la UI en vez
+   * de dos, sin cambiar el protocolo de dos pasos que exige la física (ver
+   * conversación de diseño).
+   */
+  async runTiltCalibrationStep(): Promise<void> {
+    if (this.bt.tiltCalRefCaptured$.value) {
+      await this.confirmTiltApplyCalibration();
+    } else {
+      await this.confirmTiltReferenceCalibration();
+    }
+  }
+
+  // ── Calibración de alta presión (línea/bomba), 2 puntos ─────────
+  /**
+   * v14: paso 1. Requiere el sensor a presión atmosférica (sin nada de
+   * presión aplicada) en el momento de calibrar.
+   */
+  async confirmHpZeroCalibration(): Promise<void> {
+    if (!this.bt.isConnected$.value) {
+      this.errorMessage = 'Conecta primero el dispositivo Bluetooth';
+      this.showErrorToast = true;
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Calibrar alta presión — cero',
+      message: 'Confirma que el sensor de alta presión (línea/bomba) no tiene ninguna presión aplicada ahora mismo.',
+      backdropDismiss: false,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Calibrar', role: 'confirm', handler: () => void this.runHpZeroCalibration() },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async runHpZeroCalibration(): Promise<void> {
+    if (this.calibratingHpZero) return;
+    this.calibratingHpZero = true;
+    try {
+      await this.bt.calibrateHighPressureZero();
+      this.successMessage = 'Cero de alta presión calibrado correctamente';
+      this.showSuccessToast = true;
+    } catch (err) {
+      this.errorMessage = err instanceof Error ? err.message : String(err);
+      this.showErrorToast = true;
+    } finally {
+      this.calibratingHpZero = false;
+    }
+  }
+
+  /**
+   * v14: paso 2. Pide al usuario el valor de una presión de referencia REAL
+   * que debe estar aplicando en ese momento (bomba de mano, manómetro
+   * patrón externo, etc.) — el firmware no puede medir esa referencia por
+   * su cuenta, solo la cuenta ADC correspondiente a lo que le diga el
+   * usuario. Requiere haber calibrado antes el cero.
+   */
+  async confirmHpRefCalibration(): Promise<void> {
+    if (!this.bt.isConnected$.value) {
+      this.errorMessage = 'Conecta primero el dispositivo Bluetooth';
+      this.showErrorToast = true;
+      return;
+    }
+    if (!this.bt.highPressureZeroCalibrated$.value) {
+      this.errorMessage = 'Calibra primero el cero de alta presión';
+      this.showErrorToast = true;
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Calibrar alta presión — referencia',
+      message: 'Aplica una presión conocida (bomba de mano, manómetro patrón, etc.) y escribe aquí su valor real en bar.',
+      backdropDismiss: false,
+      inputs: [
+        { name: 'refBar', type: 'number', placeholder: 'Ej. 10.0', min: 0.1, max: 60 },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Calibrar',
+          role: 'confirm',
+          handler: (data: { refBar?: string }) => {
+            const refBar = parseFloat(data?.refBar ?? '');
+            if (!isFinite(refBar) || refBar <= 0) {
+              this.errorMessage = 'Introduce un valor de presión válido, mayor que 0';
+              this.showErrorToast = true;
+              return false;
+            }
+            void this.runHpRefCalibration(refBar);
+            return true;
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async runHpRefCalibration(refBar: number): Promise<void> {
+    if (this.calibratingHpRef) return;
+    this.calibratingHpRef = true;
+    try {
+      await this.bt.calibrateHighPressureRef(refBar);
+      this.successMessage = `Referencia de alta presión calibrada (${refBar} bar)`;
+      this.showSuccessToast = true;
+    } catch (err) {
+      this.errorMessage = err instanceof Error ? err.message : String(err);
+      this.showErrorToast = true;
+    } finally {
+      this.calibratingHpRef = false;
     }
   }
 

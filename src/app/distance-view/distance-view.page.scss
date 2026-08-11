@@ -126,6 +126,28 @@ ion-toolbar {
 .panel-hdr.blue > div  { color: var(--blue); }
 .panel-hdr.orange > div { color: var(--orange); }
 
+/* v15: icono de reseteo por tarjeta (antes había un único botón para
+   ambos lados en la barra de iconos de la cabecera general). Se agrupa
+   junto al toggle en un contenedor propio para que el header conserve
+   exactamente dos hijos flex (título / acciones) y su space-between. */
+.panel-hdr-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.panel-hdr-actions ion-button {
+  margin: 0;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  height: clamp(26px, 4.4vh, 34px);
+}
+
+.panel-hdr-actions ion-button ion-icon {
+  font-size: clamp(15px, 2.6vh, 19px);
+}
+
 .panel-hdr ion-chip {
   height: clamp(24px, 4.2vh, 33px);
   margin: 0;

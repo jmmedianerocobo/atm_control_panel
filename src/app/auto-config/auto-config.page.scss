@@ -61,9 +61,12 @@ ion-toolbar {
   --overflow: hidden;
 }
 
+/* v15: ya no hay una 3ª fila (la barra de calibraciones se repartió dentro
+   de config-grid) — 2 filas en vez de 3, si no el config-grid dejaba de
+   ocupar todo el alto sobrante y aparecía un hueco vacío debajo. */
 .auto-config-content::part(scroll) {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--gap);
   height: 100%;
   min-height: 0;
@@ -421,8 +424,7 @@ ion-toolbar {
   min-height: 0;
 }
 
-.tank-fields,
-.sensor-position {
+.tank-fields {
   min-width: 0;
   min-height: 0;
 }
@@ -431,51 +433,54 @@ ion-toolbar {
   height: clamp(24px, 4.4vh, 33px);
 }
 
-.sensor-position {
-  padding: 4px 6px;
+/* v15: aquí vivía "Posición del sensor" (.sensor-position/.sensor-param, ya
+   eliminados); en su lugar, las calibraciones agrupadas temáticamente
+   dentro de cada panel (nivel/inclinación aquí, alta presión más abajo),
+   sustituyendo la barra única .cal-bar (también eliminada, ver nota que
+   quedaba junto a ella). Cada fila es una calibración: etiqueta + botón
+   compacto. */
+.cal-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cal-mini-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-height: clamp(24px, 4.4vh, 33px);
+  padding: 0 6px;
   background: rgba(66,213,205,.035);
   border: 1px solid rgba(66,213,205,.15);
   border-radius: 7px;
 }
 
-.sensor-position-title {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
-  color: var(--teal);
-  font-size: clamp(7px, 1.2vh, 9px);
-  font-weight: 800;
+.cal-mini-row.done {
+  background: rgba(75,216,91,.055);
+  border-color: rgba(75,216,91,.27);
 }
 
-.sensor-param {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  align-items: center;
-  min-height: clamp(24px, 4.4vh, 33px);
-  border-bottom: 1px solid rgba(130,160,190,.09);
-}
-
-.sensor-param:last-child {
-  border-bottom: 0;
-}
-
-.sensor-param > span {
+.cal-mini-row > span {
+  min-width: 0;
   font-size: clamp(6px, 1.05vh, 8px);
   color: var(--soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sensor-param small {
-  grid-column: 1 / -1;
-  margin-top: -2px;
-  font-size: clamp(5px, .85vh, 6px);
-  color: var(--muted);
-}
-
-@media (orientation: landscape) and (max-height: 540px) {
-  .sensor-param small {
-    display: none;
-  }
+.cal-mini-row ion-button {
+  --border-radius: 6px;
+  flex-shrink: 0;
+  min-width: clamp(34px, 5vw, 56px);
+  min-height: clamp(20px, 3.6vh, 26px);
+  margin: 0;
+  font-size: clamp(7px, 1.2vh, 9px);
+  font-weight: 800;
 }
 
 @media (orientation: portrait), (max-width: 700px) {
@@ -659,7 +664,7 @@ ion-toolbar {
 }
 
 .config-grid .tank-fields .compact-param,
-.config-grid .sensor-param {
+.config-grid .cal-mini-row {
   min-height: 0;
   height: clamp(23px, 4.25vh, 32px);
 }
@@ -690,7 +695,7 @@ ion-toolbar {
 /* En tablets horizontales bajas se mantienen las cuatro tarjetas visibles. */
 @media (orientation: landscape) and (max-height: 650px) {
   .auto-config-content::part(scroll) {
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .config-grid {
@@ -701,7 +706,6 @@ ion-toolbar {
     min-height: 30px;
   }
 
-  .config-grid .sensor-param small,
   .config-grid .limit-copy small {
     display: none;
   }
@@ -713,7 +717,7 @@ ion-toolbar {
   }
 
   .config-grid .tank-fields .compact-param,
-  .config-grid .sensor-param {
+  .config-grid .cal-mini-row {
     height: 23px;
   }
 
@@ -739,105 +743,3 @@ ion-toolbar {
   }
 }
 
-/* CALIBRACIÓN DE NIVEL */
-/* v10 (opción A): antes había un asistente de 3 pasos (plano/vacío/lleno),
-   cada tarjeta con un círculo numerado (.step-number) en una rejilla de
-   3 columnas. El firmware solo tiene UN comando real de calibración
-   (CMD_CALIBRATE_LEVEL), así que ahora hay una única tarjeta sin número.
-   .calibration-steps pasa de 3 columnas a 1 (ya no hay que repartir el
-   ancho entre 3 tarjetas), y .calibration-step pasa de 3 a 2 columnas
-   (se elimina la columna del número, que ya no existe en el HTML). Sin
-   este cambio, el grid de 3 columnas dejaba un hueco vacío y desplazaba
-   el botón "Calibrar" hacia la derecha en vez de ocupar todo el ancho. */
-.calibration-wizard {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(18,48,81,.9), rgba(10,29,48,.96));
-  border: 1px solid rgba(64,156,255,.34);
-  border-radius: var(--panel-radius);
-}
-
-.calibration-wizard-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 30px;
-  padding: 4px 9px;
-  border-bottom: 1px solid rgba(64,156,255,.16);
-}
-
-.calibration-wizard-header > div {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--blue);
-  font-size: clamp(9px,1.5vh,12px);
-  font-weight: 800;
-}
-
-.calibration-wizard-header small {
-  font-size: clamp(6px,1vh,8px);
-  color: var(--muted);
-}
-
-.calibration-steps {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--gap);
-  padding: var(--gap);
-}
-
-.calibration-step {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  grid-template-rows: auto auto;
-  align-items: center;
-  gap: 3px 7px;
-  min-width: 0;
-  padding: 6px 8px;
-  background: rgba(255,255,255,.025);
-  border: 1px solid rgba(130,160,190,.14);
-  border-radius: 8px;
-}
-
-.calibration-step.completed {
-  background: rgba(75,216,91,.055);
-  border-color: rgba(75,216,91,.27);
-}
-
-.step-copy { min-width: 0; }
-.step-copy strong,
-.step-copy span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.step-copy strong { font-size: clamp(8px,1.4vh,11px); color: var(--text); }
-.step-copy span { margin-top: 1px; font-size: clamp(6px,1vh,8px); color: var(--muted); }
-
-.calibration-step ion-chip {
-  height: 21px;
-  margin: 0;
-  font-size: 7px;
-}
-
-.calibration-action,
-.calibration-step ion-button {
-  --border-radius: 7px;
-  grid-column: 1 / -1;
-  width: 100%;
-  min-height: 25px;
-  margin: 1px 0 0;
-  font-size: 8px;
-  font-weight: 800;
-}
-
-@media (orientation: landscape) and (max-height: 540px) {
-  .calibration-wizard-header small,
-  .step-copy span { display: none; }
-  .calibration-step { padding: 4px 6px; }
-  .calibration-step ion-button { min-height: 21px; }
-}
