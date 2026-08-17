@@ -7,6 +7,13 @@
     <ion-title>Bluetooth</ion-title>
 
     <ion-buttons slot="end">
+      <ion-button
+        fill="clear"
+        aria-label="Copiar diagnóstico"
+        (click)="copyDiagnostics()">
+        <ion-icon slot="icon-only" name="clipboard-outline"></ion-icon>
+      </ion-button>
+
       <ion-chip
         class="connection-chip"
         [color]="(isConnected$ | async) ? 'success' : 'danger'">
@@ -245,20 +252,15 @@
 
   </section>
 
-  <ion-toast
-    [isOpen]="showSuccessToast"
-    [message]="successMessage"
-    duration="2200"
-    color="success"
-    (didDismiss)="showSuccessToast = false">
-  </ion-toast>
-
-  <ion-toast
-    [isOpen]="showErrorToast"
-    [message]="errorMessage"
-    duration="3200"
-    color="danger"
-    (didDismiss)="showErrorToast = false">
-  </ion-toast>
-
 </ion-content>
+
+<!-- Fix: los avisos success/error se muestran con ToastController
+     (imperativo) en vez de <ion-toast [isOpen]> declarativo. Se depuró a
+     fondo con Chrome DevTools Protocol contra el WebView real: el
+     declarativo se activaba de verdad (isOpen/message confirmados
+     actualizados) pero el "toast-wrapper" de su shadow DOM se quedaba
+     congelado en opacity:0.01 y tamaño 0×0 en este tablet Samsung, incluso
+     con animated="false" y position="top". ToastController usa el mismo
+     camino de presentación que AlertController, que sí se ve bien en este
+     mismo dispositivo (ver confirmUnpairAll()). Ver presentToast() en el
+     .ts. -->

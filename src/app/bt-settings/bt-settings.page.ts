@@ -6,7 +6,7 @@ import {
   IonHeader, IonToolbar, IonTitle,
   IonContent, IonButtons, IonBackButton,
   IonButton, IonLabel, IonItem, IonList,
-  IonChip, IonSpinner, IonIcon, IonToast,
+  IonChip, IonSpinner, IonIcon,
   AlertController,
 } from '@ionic/angular/standalone';
 
@@ -20,7 +20,7 @@ import {
     IonHeader, IonToolbar, IonTitle,
     IonContent, IonButtons, IonBackButton,
     IonButton, IonLabel, IonItem, IonList,
-    IonChip, IonSpinner, IonIcon, IonToast,
+    IonChip, IonSpinner, IonIcon,
   ],
 })
 export class BtSettingsPage implements OnInit {
@@ -38,15 +38,32 @@ export class BtSettingsPage implements OnInit {
   isScanning   = false;
   isUnpairingAll = false;
 
-  showSuccessToast = false;
-  successMessage   = '';
-  showErrorToast   = false;
-  errorMessage     = '';
-
   constructor(
     public bt: BluetoothService,
     private alertController: AlertController,
   ) {}
+
+  // Fix: en este tablet concreto (WebView del sistema), CUALQUIER forma de
+  // <ion-toast> resultó invisible en la práctica, aunque se activaba de
+  // verdad por debajo (confirmado con Chrome DevTools Protocol,
+  // inspeccionando el shadow DOM en directo) — declarativo, ToastController
+  // imperativo, y hasta creando el elemento a mano con
+  // document.createElement() e insertándolo directamente en <ion-app>: en
+  // los tres casos, disparado desde un toque real, el "toast-wrapper" nunca
+  // llegaba a renderizarse (a veces ni siquiera existía en el shadow DOM).
+  // AlertController SÍ se ve bien en este mismo dispositivo con toda
+  // certeza (confirmUnpairAll() de más abajo, verificado visualmente varias
+  // veces) — se reutiliza como sustituto de "toast", con auto-cierre para
+  // no exigir que el usuario lo cierre a mano.
+  private async presentToast(message: string, color: 'success' | 'danger'): Promise<void> {
+    const alert = await this.alertController.create({
+      message,
+      cssClass: color === 'success' ? 'toast-alert toast-alert-success' : 'toast-alert toast-alert-danger',
+      backdropDismiss: true,
+    });
+    await alert.present();
+    setTimeout(() => alert.dismiss().catch(() => {}), color === 'success' ? 2200 : 3200);
+  }
 
   ngOnInit() {
     this.bt.loadPairedDevices().catch(err =>
@@ -159,19 +176,130 @@ export class BtSettingsPage implements OnInit {
     try {
       const { removed, failed } = await this.bt.unpairAllPaired();
       if (failed.length === 0) {
-        this.successMessage = `${removed} dispositivo(s) eliminado(s) correctamente`;
-        this.showSuccessToast = true;
+        await this.presentToast(`${removed} dispositivo(s) eliminado(s) correctamente`, 'success');
       } else {
-        this.errorMessage = `${removed} eliminado(s), ${failed.length} fallaron ` +
-          `(${failed.map(f => f.device.name).join(', ')})`;
-        this.showErrorToast = true;
+        await this.presentToast(
+          `${removed} eliminado(s), ${failed.length} fallaron (${failed.map(f => f.device.name).join(', ')})`,
+          'danger',
+        );
       }
     } catch (err) {
-      this.errorMessage = err instanceof Error ? err.message : String(err);
-      this.showErrorToast = true;
+      await this.presentToast(err instanceof Error ? err.message : String(err), 'danger');
     } finally {
       this.isUnpairingAll = false;
     }
+  }
+
+  // ── Diagnóstico ─────────────────────────────────────────────────
+  // Antes, diagnosticar un fallo de conexión en campo exigía tener el móvil
+  // enchufado por adb y leer logcat en directo — inviable para el usuario
+  // final. bt.logEntries$ ya registra todo lo interesante (conexión,
+  // reintentos, timeouts...) desde hace tiempo, pero no había ninguna forma
+  // de sacarlo de la app. Este botón vuelca las últimas entradas en texto
+  // plano y las copia al portapapeles, con 3 niveles de fallback: la mayoría
+  // de WebView Android modernas soportan navigator.clipboard.writeText()
+  // desde un gesto de usuario (este click lo es), pero si esa API no
+  // estuviera disponible o fallara, se intenta el truco clásico de
+  // execCommand('copy'), y si ni eso funciona, se muestra el texto en un
+  // cuadro de diálogo para copiarlo a mano en vez de fallar en silencio.
+  //
+  // Fix: en la práctica, en este WebView concreto navigator.clipboard.
+  // writeText() se queda "fantasma" — ni resuelve ni rechaza nunca, exacto
+  // el mismo patrón que bluetoothSerial.write()/connect() (ver writeBytes()/
+  // connect() en bluetooth.service.ts). Sin timeout, un simple botón de
+  // copiar diagnóstico se quedaba colgado en silencio para siempre.
+  // tryClipboardApi() ahora compite con un timeout corto para no bloquear
+  // nunca los otros dos niveles de fallback.
+  async copyDiagnostics(): Promise<void> {
+    const text = this.buildDiagnosticsText();
+
+    if (await this.tryClipboardApi(text)) {
+      await this.presentToast('Diagnóstico copiado al portapapeles', 'success');
+      return;
+    }
+    if (this.tryLegacyCopy(text)) {
+      await this.presentToast('Diagnóstico copiado al portapapeles', 'success');
+      return;
+    }
+    await this.showDiagnosticsForManualCopy(text);
+  }
+
+  private buildDiagnosticsText(): string {
+    const device = this.bt.connectedDevice$.value;
+    const header = [
+      'ATM Control Panel — diagnóstico Bluetooth',
+      `Generado: ${new Date().toLocaleString()}`,
+      `Estado: ${this.statusTitle}`,
+      device ? `Dispositivo: ${device.name} (${device.address})` : 'Dispositivo: ninguno',
+      `Protocolo Arduino: v${this.bt.arduinoProtocolVersion$.value}`,
+      '',
+    ].join('\n');
+
+    // logEntries$ guarda lo más nuevo primero; para un diagnóstico se lee
+    // mejor en orden cronológico (más antiguo arriba).
+    const entries = this.bt.logEntries$.value;
+    const body = entries.length === 0
+      ? '(sin entradas de log todavía — conecta primero)'
+      : entries.slice().reverse().map(e => {
+          const time = e.ts.toLocaleTimeString();
+          const data = e.data !== undefined ? ' ' + this.safeStringify(e.data) : '';
+          return `${time} [${e.level.toUpperCase()}][${e.category}] ${e.msg}${data}`;
+        }).join('\n');
+
+    return header + body;
+  }
+
+  private safeStringify(data: unknown): string {
+    try { return JSON.stringify(data); } catch { return String(data); }
+  }
+
+  private async tryClipboardApi(text: string): Promise<boolean> {
+    if (!navigator.clipboard?.writeText) return false;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          reject(new Error('CLIPBOARD_TIMEOUT'));
+        }, 1500);
+
+        navigator.clipboard.writeText(text).then(
+          () => { if (settled) return; settled = true; clearTimeout(timer); resolve(); },
+          (e) => { if (settled) return; settled = true; clearTimeout(timer); reject(e); },
+        );
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private tryLegacyCopy(text: string): boolean {
+    try {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(el);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  private async showDiagnosticsForManualCopy(text: string): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Diagnóstico (copia manual)',
+      message: 'No se pudo copiar automáticamente. Selecciona el texto y cópialo a mano:',
+      inputs: [{ type: 'textarea', value: text, name: 'diagnostics' }],
+      buttons: ['Cerrar'],
+    });
+    await alert.present();
   }
 
   // ── Helpers ────────────────────────────────────────────────────

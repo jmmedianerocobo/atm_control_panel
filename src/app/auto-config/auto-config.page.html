@@ -382,18 +382,12 @@
 
 </ion-content>
 
-<ion-toast
-  [isOpen]="showSuccessToast"
-  [message]="successMessage"
-  duration="2200"
-  color="success"
-  (didDismiss)="showSuccessToast = false">
-</ion-toast>
-
-<ion-toast
-  [isOpen]="showErrorToast"
-  [message]="errorMessage"
-  duration="3200"
-  color="danger"
-  (didDismiss)="showErrorToast = false">
-</ion-toast>
+<!-- Fix: los avisos success/error se muestran con ToastController
+     (imperativo, ver presentToast() en el .ts) en vez de <ion-toast
+     [isOpen]> declarativo — depurado a fondo con Chrome DevTools Protocol
+     contra el WebView real (mismo bug encontrado primero en
+     bt-settings.page.html): el declarativo se activaba de verdad
+     (isOpen/message confirmados actualizados) pero el "toast-wrapper" de su
+     shadow DOM se quedaba congelado en opacity:0.01 en este tablet Samsung.
+     ToastController usa el mismo camino de presentación que
+     AlertController, que sí se ve bien en este mismo dispositivo. -->
