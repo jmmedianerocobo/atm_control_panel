@@ -1,0 +1,91 @@
+diff --git a/node_modules/cordova-plugin-bluetooth-serial/src/android/com/megster/cordova/BluetoothSerial.java b/node_modules/cordova-plugin-bluetooth-serial/src/android/com/megster/cordova/BluetoothSerial.java
+index bbe41a8..c8e8a2a 100644
+--- a/node_modules/cordova-plugin-bluetooth-serial/src/android/com/megster/cordova/BluetoothSerial.java
++++ b/node_modules/cordova-plugin-bluetooth-serial/src/android/com/megster/cordova/BluetoothSerial.java
+@@ -53,6 +53,12 @@ public class BluetoothSerial extends CordovaPlugin {
+     private static final String CLEAR_DEVICE_DISCOVERED_LISTENER = "clearDeviceDiscoveredListener";
+     private static final String SET_NAME = "setName";
+     private static final String SET_DISCOVERABLE = "setDiscoverable";
++    // Fix: el plugin original no expone forma de eliminar un emparejamiento
++    // (el API público de Android tampoco lo hace; BluetoothDevice.removeBond()
++    // existe pero es @hide, solo accesible por reflexión). Se añade para
++    // poder ofrecer un botón "eliminar todos los emparejados" desde la app,
++    // sin depender de que el usuario salga a Ajustes > Bluetooth del sistema.
++    private static final String UNPAIR = "unpair";
+ 
+     // callbacks
+     private CallbackContext connectCallback;
+@@ -285,6 +291,20 @@ public class BluetoothSerial extends CordovaPlugin {
+             discoverIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, discoverableDuration);
+             cordova.getActivity().startActivity(discoverIntent);
+ 
++        } else if (action.equals(UNPAIR)) {
++
++            // Igual que LIST: en Android 12+ hace falta BLUETOOTH_CONNECT. En
++            // la práctica, si esta acción se está invocando es porque LIST ya
++            // tuvo éxito antes para poblar la lista de emparejados, así que el
++            // permiso ya debería estar concedido; aun así se comprueba por
++            // seguridad en vez de asumirlo.
++            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
++                    && !cordova.hasPermission(REQUEST_CONNECT)) {
++                callbackContext.error("Falta permiso BLUETOOTH_CONNECT para eliminar el emparejamiento.");
++            } else {
++                unpairDevice(args, callbackContext);
++            }
++
+         } else {
+             validAction = false;
+ 
+@@ -386,6 +406,35 @@ public class BluetoothSerial extends CordovaPlugin {
+ 
+     }
+ 
++    // Fix: ver nota junto a UNPAIR más arriba. BluetoothDevice.removeBond() no
++    // es parte del API público de Android (está marcado @hide desde siempre),
++    // así que la única forma de invocarlo desde una app normal es por
++    // reflexión. Es una técnica ampliamente usada y estable en la práctica:
++    // el método existe en todas las versiones de Android desde la 2.x y su
++    // firma no ha cambiado nunca.
++    private void unpairDevice(CordovaArgs args, CallbackContext callbackContext) throws JSONException {
++        String macAddress = args.getString(0);
++        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
++
++        if (device == null) {
++            callbackContext.error("Dispositivo no encontrado: " + macAddress);
++            return;
++        }
++
++        try {
++            java.lang.reflect.Method removeBondMethod = device.getClass().getMethod("removeBond");
++            Object result = removeBondMethod.invoke(device);
++            if (Boolean.TRUE.equals(result)) {
++                callbackContext.success();
++            } else {
++                callbackContext.error("removeBond() devolvió false para " + macAddress);
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "No se pudo eliminar el emparejamiento de " + macAddress, e);
++            callbackContext.error("No se pudo eliminar el emparejamiento: " + e.getMessage());
++        }
++    }
++
+     private JSONObject deviceToJSON(BluetoothDevice device) throws JSONException {
+         JSONObject json = new JSONObject();
+         json.put("name", device.getName());
+diff --git a/node_modules/cordova-plugin-bluetooth-serial/www/bluetoothSerial.js b/node_modules/cordova-plugin-bluetooth-serial/www/bluetoothSerial.js
+index 250b8aa..33ab5e6 100644
+--- a/node_modules/cordova-plugin-bluetooth-serial/www/bluetoothSerial.js
++++ b/node_modules/cordova-plugin-bluetooth-serial/www/bluetoothSerial.js
+@@ -112,6 +112,12 @@ module.exports = {
+         cordova.exec(success, failure, "BluetoothSerial", "discoverUnpaired", []);
+     },
+ 
++    // Android only. Elimina el emparejamiento del dispositivo (removeBond()
++    // vía reflexión — no forma parte del API público de Android).
++    unpair: function (macAddress, success, failure) {
++        cordova.exec(success, failure, "BluetoothSerial", "unpair", [macAddress]);
++    },
++
+     setDeviceDiscoveredListener: function (notify) {
+         if (typeof notify != 'function')
+             throw 'BluetoothSerial.setDeviceDiscoveredListener: Callback not a function';

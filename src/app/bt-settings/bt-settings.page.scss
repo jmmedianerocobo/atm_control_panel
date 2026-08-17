@@ -198,6 +198,13 @@ ion-toolbar {
     margin: 0;
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
   ion-chip {
     height: clamp(21px, 3.6vh, 27px);
     margin: 0;

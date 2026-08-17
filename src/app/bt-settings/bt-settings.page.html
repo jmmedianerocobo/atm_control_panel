@@ -83,14 +83,26 @@
             <span>Dispositivos emparejados</span>
           </div>
 
-          <ion-button
-            fill="clear"
-            size="small"
-            color="medium"
-            [disabled]="isConnecting"
-            (click)="bt.loadPairedDevices()">
-            <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
-          </ion-button>
+          <div class="header-actions">
+            <ion-button
+              fill="clear"
+              size="small"
+              color="danger"
+              [disabled]="isConnecting || isUnpairingAll || ((pairedDevices$ | async)?.length ?? 0) === 0"
+              (click)="confirmUnpairAll()">
+              <ion-spinner *ngIf="isUnpairingAll" name="crescent" slot="icon-only"></ion-spinner>
+              <ion-icon *ngIf="!isUnpairingAll" slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-button>
+
+            <ion-button
+              fill="clear"
+              size="small"
+              color="medium"
+              [disabled]="isConnecting"
+              (click)="bt.loadPairedDevices()">
+              <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+            </ion-button>
+          </div>
         </header>
 
         <div class="device-list scroll-area">
@@ -232,5 +244,21 @@
     </div>
 
   </section>
+
+  <ion-toast
+    [isOpen]="showSuccessToast"
+    [message]="successMessage"
+    duration="2200"
+    color="success"
+    (didDismiss)="showSuccessToast = false">
+  </ion-toast>
+
+  <ion-toast
+    [isOpen]="showErrorToast"
+    [message]="errorMessage"
+    duration="3200"
+    color="danger"
+    (didDismiss)="showErrorToast = false">
+  </ion-toast>
 
 </ion-content>

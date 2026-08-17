@@ -404,6 +404,25 @@ export class BluetoothService {
   private readonly MAX_RECONNECT_ATTEMPTS = 3;
   private reconnectAttempts = 0;
 
+  // Fix: mismo motivo que WRITE_TIMEOUT en writeBytes() -- bluetoothSerial.
+  // connect() puede quedarse "fantasma" (sin llamar a ningún callback) igual
+  // que write(). Sin timeout, connect() nunca resuelve ni rechaza, así que
+  // el finally de reconnect() que libera `this.reconnecting` tampoco se
+  // ejecuta nunca, y la guarda de reentrada al principio de reconnect()
+  // convierte todas las reconexiones futuras en un no-op silencioso — visto
+  // en vivo: un connect() colgado minutos, seguido de "reconectando" en
+  // bucle sin hacer nada real.
+  // v2: subido de 15000 a 30000 tras ver en logcat real que el propio plugin
+  // nativo (BluetoothSerialService) hace DOS intentos secuenciales cuando el
+  // socket RFCOMM "normal" falla: uno con el socket seguro estándar (~12s
+  // hasta el IOException "read failed, timeout") y, si falla, un fallback
+  // por reflexión (createRfcommSocket) pensado justo para módulos como el
+  // HC-06 que no implementan SDP correctamente (~10-12s más). Con 15s
+  // nuestro propio timeout cortaba ese segundo intento a mitad, antes de que
+  // tuviera ocasión de tener éxito — descartando por impaciencia justo el
+  // camino que más veces suele funcionar con estos módulos.
+  private readonly CONNECT_TIMEOUT_MS = 30000;
+
   // v8: valor inicial 4 (antes 3), coherente con arduinoProtocolVersion$ arriba.
   private arduinoProtocolVersion = 4;
 
@@ -558,6 +577,50 @@ export class BluetoothService {
     this.zone.run(() => this.pairedDevices$.next(devs));
   }
 
+  // Fix: el plugin original no tenía forma de eliminar un emparejamiento —
+  // ver patches/cordova-plugin-bluetooth-serial+*.patch, que le añade la
+  // acción nativa "unpair" (removeBond() por reflexión, Android only). Si el
+  // dispositivo a eliminar es el que está conectado ahora mismo, se
+  // desconecta antes: no tiene sentido pedir quitar el vínculo con el socket
+  // RFCOMM todavía abierto.
+  async unpairDevice(address: string): Promise<void> {
+    if (typeof bluetoothSerial?.unpair !== 'function') {
+      throw new Error('Esta plataforma no soporta eliminar emparejamientos');
+    }
+    if (this.isConnected$.value && this.connectedDevice$.value?.address === address) {
+      await this.disconnect().catch(() => {});
+    }
+    await new Promise<void>((resolve, reject) => {
+      bluetoothSerial.unpair(address, () => resolve(), (e: any) => reject(e));
+    });
+  }
+
+  /**
+   * Elimina el emparejamiento de TODOS los dispositivos de pairedDevices$.
+   * Sigue con el resto aunque alguno falle (en vez de abortar al primer
+   * error) y devuelve cuántos se eliminaron y cuáles fallaron con su motivo,
+   * para que la UI pueda informar con precisión en vez de un simple
+   * todo-o-nada. Refresca pairedDevices$ al terminar.
+   */
+  async unpairAllPaired(): Promise<{ removed: number; failed: { device: BluetoothDevice; error: any }[] }> {
+    const devices = this.pairedDevices$.value;
+    let removed = 0;
+    const failed: { device: BluetoothDevice; error: any }[] = [];
+
+    for (const dev of devices) {
+      try {
+        await this.unpairDevice(dev.address);
+        removed++;
+      } catch (e) {
+        this.log('warn', 'UNPAIR', `No se pudo eliminar ${dev.name} (${dev.address})`, e);
+        failed.push({ device: dev, error: e });
+      }
+    }
+
+    await this.loadPairedDevices().catch(() => {});
+    return { removed, failed };
+  }
+
   async scanForUnpaired(): Promise<void> {
     return new Promise((resolve, reject) => {
       const fn = bluetoothSerial?.discoverUnpaired;
@@ -585,8 +648,22 @@ export class BluetoothService {
     try { bluetoothSerial.unsubscribeRawData(() => {}, () => {}); } catch {}
     try { bluetoothSerial.unsubscribe(() => {}, () => {}); } catch {}
 
+    // Fix: ver nota junto a CONNECT_TIMEOUT_MS. El patrón "settled" ignora
+    // con seguridad un callback nativo tardío que llegue después de que el
+    // timeout ya haya resuelto la promesa (igual que en writeBytes()).
     await new Promise<void>((resolve, reject) => {
-      bluetoothSerial.connect(address, () => resolve(), (e: any) => reject(e));
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('CONNECT_TIMEOUT'));
+      }, this.CONNECT_TIMEOUT_MS);
+
+      bluetoothSerial.connect(
+        address,
+        () => { if (settled) return; settled = true; clearTimeout(timer); resolve(); },
+        (e: any) => { if (settled) return; settled = true; clearTimeout(timer); reject(e); },
+      );
     });
 
     this.log('info', 'CONNECT', `Conexión BT establecida con ${this.device.name}`);

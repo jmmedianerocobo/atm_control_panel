@@ -6,7 +6,8 @@ import {
   IonHeader, IonToolbar, IonTitle,
   IonContent, IonButtons, IonBackButton,
   IonButton, IonLabel, IonItem, IonList,
-  IonChip, IonSpinner, IonIcon
+  IonChip, IonSpinner, IonIcon, IonToast,
+  AlertController,
 } from '@ionic/angular/standalone';
 
 @Component({
@@ -19,7 +20,7 @@ import {
     IonHeader, IonToolbar, IonTitle,
     IonContent, IonButtons, IonBackButton,
     IonButton, IonLabel, IonItem, IonList,
-    IonChip, IonSpinner, IonIcon,
+    IonChip, IonSpinner, IonIcon, IonToast,
   ],
 })
 export class BtSettingsPage implements OnInit {
@@ -35,8 +36,17 @@ export class BtSettingsPage implements OnInit {
 
   isConnecting = false;
   isScanning   = false;
+  isUnpairingAll = false;
 
-  constructor(public bt: BluetoothService) {}
+  showSuccessToast = false;
+  successMessage   = '';
+  showErrorToast   = false;
+  errorMessage     = '';
+
+  constructor(
+    public bt: BluetoothService,
+    private alertController: AlertController,
+  ) {}
 
   ngOnInit() {
     this.bt.loadPairedDevices().catch(err =>
@@ -116,6 +126,52 @@ export class BtSettingsPage implements OnInit {
 
   async tryConnect(device: BluetoothDevice) {
     await this.connectTo(device);
+  }
+
+  // ── Eliminar emparejados ───────────────────────────────────────
+  // Acción destructiva/difícil de deshacer (hay que volver a emparejar a
+  // mano cada dispositivo desde Ajustes del sistema), así que se confirma
+  // antes — mismo patrón que las calibraciones de auto-config.page.ts.
+  async confirmUnpairAll(): Promise<void> {
+    const count = this.pairedDevices$.value.length;
+    if (count === 0) return;
+
+    const alert = await this.alertController.create({
+      header: 'Eliminar todos los emparejados',
+      message:
+        `Se eliminará el emparejamiento de los ${count} dispositivo(s) Bluetooth ` +
+        'listados. Tendrás que volver a emparejarlos manualmente (desde Ajustes ' +
+        'del sistema o "Iniciar búsqueda") para volver a usarlos. Si hay uno ' +
+        'conectado ahora mismo, se desconectará primero.',
+      backdropDismiss: false,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Eliminar todos', role: 'destructive', handler: () => void this.runUnpairAll() },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async runUnpairAll(): Promise<void> {
+    if (this.isUnpairingAll) return;
+    this.isUnpairingAll = true;
+
+    try {
+      const { removed, failed } = await this.bt.unpairAllPaired();
+      if (failed.length === 0) {
+        this.successMessage = `${removed} dispositivo(s) eliminado(s) correctamente`;
+        this.showSuccessToast = true;
+      } else {
+        this.errorMessage = `${removed} eliminado(s), ${failed.length} fallaron ` +
+          `(${failed.map(f => f.device.name).join(', ')})`;
+        this.showErrorToast = true;
+      }
+    } catch (err) {
+      this.errorMessage = err instanceof Error ? err.message : String(err);
+      this.showErrorToast = true;
+    } finally {
+      this.isUnpairingAll = false;
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────
