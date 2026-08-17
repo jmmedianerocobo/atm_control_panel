@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { AutoConfigPage } from './auto-config.page_lst';
+import { AutoConfigPage } from './auto-config.page';
 
 describe('AutoConfigPage', () => {
   let component: AutoConfigPage;
