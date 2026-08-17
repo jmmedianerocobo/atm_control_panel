@@ -108,7 +108,6 @@ export class AutoConfigPage {
   calibratingTiltRef   = false;
   calibratingTiltApply = false;
   calibratingHpZero = false;
-  calibratingHpRef  = false;
 
   // v10 (opción A): CMD_CALIBRATE_LEVEL calibra a la vez el cero de presión
   // (depósito vacío) y el plano del MPU6050.
@@ -123,9 +122,10 @@ export class AutoConfigPage {
   // asumir la densidad del líquido — ver CMD_CALIBRATE_LEVEL_FULL.
   levelFullCalibrated$ = this.bt.levelFullCalibrated$;
 
-  // v14: calibración de 2 puntos del sensor de ALTA presión (línea/bomba).
+  // v14: calibración del cero del sensor de ALTA presión (línea/bomba).
+  // v19: ya no se calibra "referencia" desde esta pantalla -- ver nota
+  // junto a la eliminación de confirmHpRefCalibration().
   highPressureZeroCalibrated$ = this.bt.highPressureZeroCalibrated$;
-  highPressureRefCalibrated$  = this.bt.highPressureRefCalibrated$;
 
   constructor(
     public bt: BluetoothService,
@@ -446,9 +446,12 @@ export class AutoConfigPage {
 
   // ── Autocalibración de la posición del sensor por inclinación ───
   /**
-   * v13: paso 1. Requiere vacío+lleno ya calibrados (el firmware necesita
-   * el gradiente presión/mm) y equipo nivelado y quieto — cualquier nivel
-   * de llenado vale, pero no debe cambiar hasta terminar el paso 2.
+   * v16: paso 1. Requiere el cero de presión (vacío) calibrado — ya NO hace
+   * falta "Lleno" primero. El gradiente presión/mm lo da la calibración de
+   * 2 puntos si existe, o si no una estimación por densidad asumida (ver
+   * psiPerMmEstimate() en el firmware). Además, calibrar con el depósito
+   * realmente lleno sería contraproducente: al no poder desplazarse el
+   * líquido, la inclinación apenas cambia la presión medida.
    */
   async confirmTiltReferenceCalibration(): Promise<void> {
     if (!this.bt.isConnected$.value) {
@@ -456,8 +459,8 @@ export class AutoConfigPage {
       this.showErrorToast = true;
       return;
     }
-    if (!this.bt.levelCalibrated$.value || !this.bt.levelFullCalibrated$.value) {
-      this.errorMessage = 'Calibra primero el nivel vacío y lleno';
+    if (!this.bt.levelCalibrated$.value) {
+      this.errorMessage = 'Calibra primero el nivel vacío';
       this.showErrorToast = true;
       return;
     }
@@ -601,67 +604,12 @@ export class AutoConfigPage {
     }
   }
 
-  /**
-   * v14: paso 2. Pide al usuario el valor de una presión de referencia REAL
-   * que debe estar aplicando en ese momento (bomba de mano, manómetro
-   * patrón externo, etc.) — el firmware no puede medir esa referencia por
-   * su cuenta, solo la cuenta ADC correspondiente a lo que le diga el
-   * usuario. Requiere haber calibrado antes el cero.
-   */
-  async confirmHpRefCalibration(): Promise<void> {
-    if (!this.bt.isConnected$.value) {
-      this.errorMessage = 'Conecta primero el dispositivo Bluetooth';
-      this.showErrorToast = true;
-      return;
-    }
-    if (!this.bt.highPressureZeroCalibrated$.value) {
-      this.errorMessage = 'Calibra primero el cero de alta presión';
-      this.showErrorToast = true;
-      return;
-    }
-
-    const alert = await this.alertController.create({
-      header: 'Calibrar alta presión — referencia',
-      message: 'Aplica una presión conocida (bomba de mano, manómetro patrón, etc.) y escribe aquí su valor real en bar.',
-      backdropDismiss: false,
-      inputs: [
-        { name: 'refBar', type: 'number', placeholder: 'Ej. 10.0', min: 0.1, max: 60 },
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Calibrar',
-          role: 'confirm',
-          handler: (data: { refBar?: string }) => {
-            const refBar = parseFloat(data?.refBar ?? '');
-            if (!isFinite(refBar) || refBar <= 0) {
-              this.errorMessage = 'Introduce un valor de presión válido, mayor que 0';
-              this.showErrorToast = true;
-              return false;
-            }
-            void this.runHpRefCalibration(refBar);
-            return true;
-          },
-        },
-      ],
-    });
-    await alert.present();
-  }
-
-  private async runHpRefCalibration(refBar: number): Promise<void> {
-    if (this.calibratingHpRef) return;
-    this.calibratingHpRef = true;
-    try {
-      await this.bt.calibrateHighPressureRef(refBar);
-      this.successMessage = `Referencia de alta presión calibrada (${refBar} bar)`;
-      this.showSuccessToast = true;
-    } catch (err) {
-      this.errorMessage = err instanceof Error ? err.message : String(err);
-      this.showErrorToast = true;
-    } finally {
-      this.calibratingHpRef = false;
-    }
-  }
+  // v19: se quita el paso de "Presión ref." (confirmHpRefCalibration/
+  // runHpRefCalibration) -- el sensor real es de 0-60 bar, coincide con
+  // HIGH_PRESSURE_MAX_BAR del firmware, así que el cero calibrado solo ya
+  // da lecturas correctas. bt.calibrateHighPressureRef() se deja en el
+  // servicio por si hiciera falta en el futuro (sensor distinto, etc.),
+  // solo se quita el botón/flujo de esta pantalla.
 
   async startLeft() {
     try {

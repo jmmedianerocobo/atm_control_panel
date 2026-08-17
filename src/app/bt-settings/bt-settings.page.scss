@@ -160,10 +160,15 @@ ion-toolbar {
   overflow: hidden;
 }
 
+/* v17: antes eran 2 filas (Buscar + Ultrasonidos, ya eliminado) -- con una
+   sola tarjeta ya no hace falta grid, que ocupe toda la columna. */
 .right-column {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: var(--gap);
+  display: flex;
+  min-height: 0;
+}
+
+.right-column > .section-card {
+  flex: 1;
 }
 
 .section-card {
@@ -201,7 +206,6 @@ ion-toolbar {
 
   &.blue .section-title { color: var(--blue); }
   &.purple .section-title { color: var(--purple); }
-  &.green .section-title { color: var(--green); }
 }
 
 .section-title {
@@ -365,71 +369,6 @@ ion-toolbar {
   }
 }
 
-/* SENSORES */
-.sensors-card {
-  height: auto;
-}
-
-.sensor-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--gap);
-  padding: var(--gap);
-}
-
-.sensor-card {
-  display: flex;
-  align-items: center;
-  gap: clamp(6px, 0.9vw, 10px);
-  min-height: clamp(48px, 8vh, 63px);
-  padding: clamp(6px, 0.9vh, 10px);
-  background: var(--panel-soft);
-  border: 1px solid rgba(130, 160, 190, 0.14);
-  border-radius: clamp(7px, 1vh, 10px);
-}
-
-.sensor-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: clamp(29px, 4.8vh, 38px);
-  height: clamp(29px, 4.8vh, 38px);
-  flex-shrink: 0;
-  color: var(--blue);
-  background: rgba(64, 156, 255, 0.09);
-  border: 1px solid rgba(64, 156, 255, 0.22);
-  border-radius: 50%;
-
-  &.left {
-    color: var(--green);
-  }
-
-  &.right {
-    color: var(--amber);
-  }
-}
-
-.sensor-data {
-  min-width: 0;
-}
-
-.sensor-lbl {
-  display: block;
-  font-size: clamp(7px, 1.2vh, 9px);
-  color: var(--muted);
-}
-
-.sensor-val {
-  display: block;
-  margin-top: 2px;
-  overflow: hidden;
-  font-size: clamp(14px, 2.7vh, 20px);
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-}
-
 /* TABLETS BAJAS */
 @media (orientation: landscape) and (max-height: 560px) {
   ion-toolbar {
@@ -446,10 +385,6 @@ ion-toolbar {
 
   .device-row {
     min-height: 39px;
-  }
-
-  .sensor-card {
-    min-height: 43px;
   }
 }
 

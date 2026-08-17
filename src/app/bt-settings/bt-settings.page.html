@@ -229,56 +229,6 @@
         </div>
       </article>
 
-      <!-- SENSORES -->
-      <article class="section-card sensors-card">
-
-        <header class="section-hdr green">
-          <div class="section-title">
-            <ion-icon name="pulse-outline"></ion-icon>
-            <span>Ultrasonidos</span>
-          </div>
-
-          <ion-button
-            fill="clear"
-            size="small"
-            color="medium"
-            [disabled]="!(isConnected$ | async)"
-            (click)="requestStatus()">
-            <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
-          </ion-button>
-        </header>
-
-        <div class="sensor-grid">
-
-          <div class="sensor-card">
-            <div class="sensor-icon left">
-              <ion-icon name="arrow-back-outline"></ion-icon>
-            </div>
-
-            <div class="sensor-data">
-              <span class="sensor-lbl">Izquierda</span>
-              <strong class="sensor-val">
-                {{ left$ | async }} cm
-              </strong>
-            </div>
-          </div>
-
-          <div class="sensor-card">
-            <div class="sensor-icon right">
-              <ion-icon name="arrow-forward-outline"></ion-icon>
-            </div>
-
-            <div class="sensor-data">
-              <span class="sensor-lbl">Derecha</span>
-              <strong class="sensor-val">
-                {{ right$ | async }} cm
-              </strong>
-            </div>
-          </div>
-
-        </div>
-      </article>
-
     </div>
 
   </section>

@@ -27,8 +27,6 @@ export class BtSettingsPage implements OnInit {
   isConnected$     = this.bt.isConnected$;
   pairedDevices$   = this.bt.pairedDevices$;
   unpairedDevices$ = this.bt.unpairedDevices$;
-  left$            = this.bt.distanceLeft$;
-  right$           = this.bt.distanceRight$;
   // Fix: nombre/dirección del dispositivo conectado leídos del servicio
   // (sobrevive a que esta página se destruya/recree al navegar fuera y
   // volver), en vez de guardados en campos locales del componente que se
@@ -118,13 +116,6 @@ export class BtSettingsPage implements OnInit {
 
   async tryConnect(device: BluetoothDevice) {
     await this.connectTo(device);
-  }
-
-  // ── Sensores ───────────────────────────────────────────────────
-  requestStatus() {
-    this.bt.requestStatus().catch(err =>
-      console.error('Error solicitando el estado:', err)
-    );
   }
 
   // ── Helpers ────────────────────────────────────────────────────

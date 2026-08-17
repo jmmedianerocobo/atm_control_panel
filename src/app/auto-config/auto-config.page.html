@@ -264,26 +264,26 @@
             <div class="cal-mini-row" [class.done]="levelCalibrated$ | async">
               <span>Vacío</span>
               <ion-button
-                fill="solid" color="primary" size="small"
+                fill="solid" [color]="(levelCalibrated$ | async) ? 'success' : 'primary'" size="small"
                 [disabled]="calibrating || !(bt.isConnected$ | async)"
                 (click)="confirmLevelCalibration()">
-                {{ calibrating ? '…' : ((levelCalibrated$ | async) ? '↻' : 'Calibrar') }}
+                {{ calibrating ? '…' : ((levelCalibrated$ | async) ? '✓ Recalibrar' : 'Calibrar') }}
               </ion-button>
             </div>
             <div class="cal-mini-row" [class.done]="levelFullCalibrated$ | async">
               <span>Lleno</span>
               <ion-button
-                fill="solid" color="primary" size="small"
+                fill="solid" [color]="(levelFullCalibrated$ | async) ? 'success' : 'primary'" size="small"
                 [disabled]="calibratingFull || !(levelCalibrated$ | async) || !(bt.isConnected$ | async)"
                 (click)="confirmFullLevelCalibration()">
-                {{ calibratingFull ? '…' : ((levelFullCalibrated$ | async) ? '↻' : 'Calibrar') }}
+                {{ calibratingFull ? '…' : ((levelFullCalibrated$ | async) ? '✓ Recalibrar' : 'Calibrar') }}
               </ion-button>
             </div>
             <div class="cal-mini-row" [class.done]="tiltCalRefCaptured$ | async">
               <span>Inclinación ({{ sensorLongitudinalMm$ | async }}mm)</span>
               <ion-button
                 fill="solid" color="primary" size="small"
-                [disabled]="calibratingTiltRef || calibratingTiltApply || !(levelCalibrated$ | async) || !(levelFullCalibrated$ | async) || !(bt.isConnected$ | async)"
+                [disabled]="calibratingTiltRef || calibratingTiltApply || !(levelCalibrated$ | async) || !(bt.isConnected$ | async)"
                 (click)="runTiltCalibrationStep()">
                 {{ (calibratingTiltRef || calibratingTiltApply) ? '…' : ((tiltCalRefCaptured$ | async) ? 'Calcular' : 'Calibrar') }}
               </ion-button>
@@ -310,8 +310,8 @@
           </div>
 
           <div class="pressure-limit-controls">
-            <div class="pressure-limit-row low-limit">
-              <div class="limit-copy">
+            <div class="param-row pressure-limit-row">
+              <div class="param-copy">
                 <span>Límite inferior</span>
                 <small>Restablece la alarma</small>
               </div>
@@ -326,8 +326,8 @@
               </div>
             </div>
 
-            <div class="pressure-limit-row high-limit">
-              <div class="limit-copy">
+            <div class="param-row pressure-limit-row">
+              <div class="param-copy">
                 <span>Límite superior</span>
                 <small>Dispara la alarma</small>
               </div>
@@ -357,24 +357,20 @@
             </div>
 
             <!-- v15: calibraciones de alta presión, agrupadas aquí por tema
-                 en vez de en una barra aparte. -->
+                 en vez de en una barra aparte.
+                 v19: se quita "Presión ref." -- el sensor real es de 0-60 bar,
+                 coincide exactamente con HIGH_PRESSURE_MAX_BAR en el
+                 firmware, así que el modelo de reserva (solo con el cero
+                 calibrado) ya da lecturas correctas sin necesitar una
+                 referencia real aplicada. -->
             <div class="cal-mini-list">
               <div class="cal-mini-row" [class.done]="highPressureZeroCalibrated$ | async">
                 <span>Presión cero</span>
                 <ion-button
-                  fill="solid" color="primary" size="small"
+                  fill="solid" [color]="(highPressureZeroCalibrated$ | async) ? 'success' : 'primary'" size="small"
                   [disabled]="calibratingHpZero || !(bt.isConnected$ | async)"
                   (click)="confirmHpZeroCalibration()">
-                  {{ calibratingHpZero ? '…' : ((highPressureZeroCalibrated$ | async) ? '↻' : 'Calibrar') }}
-                </ion-button>
-              </div>
-              <div class="cal-mini-row" [class.done]="highPressureRefCalibrated$ | async">
-                <span>Presión ref.</span>
-                <ion-button
-                  fill="solid" color="primary" size="small"
-                  [disabled]="calibratingHpRef || !(highPressureZeroCalibrated$ | async) || !(bt.isConnected$ | async)"
-                  (click)="confirmHpRefCalibration()">
-                  {{ calibratingHpRef ? '…' : ((highPressureRefCalibrated$ | async) ? '↻' : 'Calibrar') }}
+                  {{ calibratingHpZero ? '…' : ((highPressureZeroCalibrated$ | async) ? '✓ Recalibrar' : 'Calibrar') }}
                 </ion-button>
               </div>
             </div>

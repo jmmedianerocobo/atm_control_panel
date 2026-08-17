@@ -541,44 +541,14 @@ ion-toolbar {
   gap: 4px;
 }
 
-.pressure-limit-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-height: clamp(36px, 6.2vh, 50px);
-  padding: clamp(4px, .7vh, 8px) clamp(7px, 1vw, 11px);
-  background: var(--panel-soft);
-  border: 1px solid rgba(130, 160, 190, .13);
-  border-radius: 7px;
-}
-
-.pressure-limit-row.low-limit,
-.pressure-limit-row.high-limit {
-  border-left: 3px solid var(--red);
-}
-
-.limit-copy {
-  min-width: 0;
-}
-
-.limit-copy span {
-  display: block;
-  font-size: clamp(9px, 1.55vh, 12px);
-  font-weight: 800;
-  color: var(--text);
-}
-
-.limit-copy small {
-  display: block;
-  margin-top: 1px;
-  overflow: hidden;
-  font-size: clamp(6px, 1.05vh, 8px);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-}
-
+/* v17: las filas de Límite inferior/superior ya no son tarjetas aparte con
+   fondo y acento de color -- ahora reusan .param-row/.param-copy tal cual
+   (mismo estilo de lista plana que "Modo distancia"/"Modo temporizado"),
+   para que la presentación de los parámetros sea consistente en todos los
+   paneles. .pressure-limit-row se conserva solo como gancho para el ancho
+   de valor algo mayor que necesitan "18.0 bar"/"60.0 bar" frente a valores
+   más cortos como "100 cm".
+ */
 .pressure-limit-row .stepper strong {
   width: clamp(76px, 10vw, 104px);
 }
@@ -615,14 +585,6 @@ ion-toolbar {
 @media (orientation: landscape) and (max-height: 540px) {
   .pressure-config-layout {
     grid-template-columns: minmax(125px, .55fr) minmax(0, 1.45fr);
-  }
-
-  .limit-copy small {
-    display: none;
-  }
-
-  .pressure-limit-row {
-    min-height: 31px;
   }
 }
 
@@ -683,11 +645,6 @@ ion-toolbar {
   font-size: clamp(22px, 4.5vh, 34px);
 }
 
-.config-grid .pressure-limit-row {
-  min-height: clamp(30px, 5.1vh, 40px);
-  padding: clamp(3px, 0.5vh, 6px) clamp(5px, 0.75vw, 8px);
-}
-
 .config-grid .pressure-limit-row .stepper strong {
   width: clamp(68px, 8vw, 90px);
 }
@@ -705,10 +662,6 @@ ion-toolbar {
   .config-grid .panel-header {
     min-height: 30px;
   }
-
-  .config-grid .limit-copy small {
-    display: none;
-  }
 }
 
 @media (orientation: landscape) and (max-height: 540px) {
@@ -723,10 +676,6 @@ ion-toolbar {
 
   .config-grid .pressure-config-layout {
     grid-template-columns: minmax(105px, 0.55fr) minmax(0, 1.45fr);
-  }
-
-  .config-grid .pressure-limit-row {
-    min-height: 28px;
   }
 }
 
