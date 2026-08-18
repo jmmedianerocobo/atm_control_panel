@@ -20,9 +20,17 @@ import {
 // sección "PROTOCOLO"), así que se duplican aquí solo como literales para
 // poder identificar en los asserts qué comando mandó sendCmd(). Si algún día
 // cambian esos opcodes en la fuente, hay que actualizarlos también aquí.
-const CMD_SET_CONFIG = 0x02;
-const CMD_GET_STATUS = 0x03;
-const CMD_SET_ENABLE = 0x05;
+const CMD_SET_CONFIG                     = 0x02;
+const CMD_GET_STATUS                     = 0x03;
+const CMD_SET_ENABLE                     = 0x05;
+const CMD_CALIBRATE_LEVEL                = 0x09;
+const CMD_SET_HIGH_PRESSURE_CONFIG       = 0x0A;
+const CMD_CALIBRATE_LEVEL_FULL           = 0x0B;
+const CMD_SET_TANK_GEOMETRY              = 0x0C;
+const CMD_CALIBRATE_TILT_REF             = 0x0D;
+const CMD_CALIBRATE_TILT_APPLY           = 0x0E;
+const CMD_CALIBRATE_HIGH_PRESSURE_ZERO   = 0x0F;
+const CMD_CALIBRATE_HIGH_PRESSURE_REF    = 0x19;
 
 function u16LE(v: number): [number, number] { return [v & 0xFF, (v >> 8) & 0xFF]; }
 function u32LE(v: number): [number, number, number, number] {
@@ -403,5 +411,286 @@ describe('BluetoothService (fachada de dominio)', () => {
       expect(transport.disconnect).toHaveBeenCalledTimes(1);
       expect(transport.connect).toHaveBeenCalledTimes(1);
     }));
+  });
+
+  // ================================================================
+  describe('calibraciones', () => {
+    it('calibrateLevel() manda CMD_CALIBRATE_LEVEL, marca levelCalibrated$ y resetea las lecturas a 0 optimistamente', async () => {
+      service.levelPressurePsi$.next(5); service.levelMm$.next(120); service.levelPercent$.next(40);
+
+      await service.calibrateLevel();
+
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_CALIBRATE_LEVEL);
+      expect(calls.length).toBe(1);
+      expect(service.levelCalibrated$.value).toBeTrue();
+      expect(service.levelPressurePsi$.value).toBe(0);
+      expect(service.levelMm$.value).toBe(0);
+      expect(service.levelPercent$.value).toBe(0);
+    });
+
+    it('calibrateLevelFull() manda CMD_CALIBRATE_LEVEL_FULL y marca levelFullCalibrated$', async () => {
+      await service.calibrateLevelFull();
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_CALIBRATE_LEVEL_FULL);
+      expect(calls.length).toBe(1);
+      expect(service.levelFullCalibrated$.value).toBeTrue();
+    });
+
+    it('calibrateTiltReference() manda CMD_CALIBRATE_TILT_REF y marca tiltCalRefCaptured$', async () => {
+      await service.calibrateTiltReference();
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_CALIBRATE_TILT_REF);
+      expect(calls.length).toBe(1);
+      expect(service.tiltCalRefCaptured$.value).toBeTrue();
+    });
+
+    it('calibrateTiltApply() OK: manda CMD_CALIBRATE_TILT_APPLY y desmarca tiltCalRefCaptured$', async () => {
+      service.tiltCalRefCaptured$.next(true);
+      await service.calibrateTiltApply();
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_CALIBRATE_TILT_APPLY);
+      expect(calls.length).toBe(1);
+      expect(service.tiltCalRefCaptured$.value).toBeFalse();
+    });
+
+    it('calibrateTiltApply() si falla (p.ej. BAD_VALUE por inclinación insuficiente): conserva tiltCalRefCaptured$ para poder reintentar el paso 2 sin repetir el paso 1', async () => {
+      service.tiltCalRefCaptured$.next(true);
+      transport.sendCmd.and.callFake((cmdType: number) =>
+        cmdType === CMD_CALIBRATE_TILT_APPLY ? Promise.reject('BAD_VALUE') : Promise.resolve()
+      );
+
+      let error: any;
+      try { await service.calibrateTiltApply(); } catch (e) { error = e; }
+
+      expect(error).toBeDefined();
+      expect(service.tiltCalRefCaptured$.value).toBeTrue(); // sigue en true, no se pierde el paso 1
+    });
+
+    it('calibrateHighPressureZero() manda CMD_CALIBRATE_HIGH_PRESSURE_ZERO, marca el cero e invalida cualquier referencia previa', async () => {
+      service.highPressureRefCalibrated$.next(true); // referencia previa, debe invalidarse: ya no es coherente con el cero nuevo
+
+      await service.calibrateHighPressureZero();
+
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_CALIBRATE_HIGH_PRESSURE_ZERO);
+      expect(calls.length).toBe(1);
+      expect(service.highPressureZeroCalibrated$.value).toBeTrue();
+      expect(service.highPressureRefCalibrated$.value).toBeFalse();
+    });
+
+    it('calibrateHighPressureRef() valida el rango (0, 60] antes de mandar nada', async () => {
+      let error: any;
+      try { await service.calibrateHighPressureRef(0); } catch (e) { error = e; }
+      expect(error).toBeDefined();
+
+      error = undefined;
+      try { await service.calibrateHighPressureRef(60.1); } catch (e) { error = e; }
+      expect(error).toBeDefined();
+
+      expect(transport.sendCmd).not.toHaveBeenCalled();
+    });
+
+    it('calibrateHighPressureRef() manda CMD_CALIBRATE_HIGH_PRESSURE_REF con refBar*100 en u16LE y marca la referencia calibrada', async () => {
+      await service.calibrateHighPressureRef(18.5);
+
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_CALIBRATE_HIGH_PRESSURE_REF);
+      expect(calls.length).toBe(1);
+      const payload = calls[0][1] as Uint8Array;
+      expect(Array.from(payload)).toEqual(u16LE(1850));
+      expect(service.highPressureRefCalibrated$.value).toBeTrue();
+    });
+  });
+
+  // ================================================================
+  describe('setTankGeometry()', () => {
+    it('valida heightMm en [100,5000] sin mandar nada si está fuera de rango', async () => {
+      let error: any;
+      try { await service.setTankGeometry(50, 0); } catch (e) { error = e; }
+      expect(error).toBeDefined();
+
+      error = undefined;
+      try { await service.setTankGeometry(5001, 0); } catch (e) { error = e; }
+      expect(error).toBeDefined();
+
+      expect(transport.sendCmd).not.toHaveBeenCalled();
+    });
+
+    it('valida sensorLongitudinalOffsetMm en [-5000,5000] sin mandar nada si está fuera de rango', async () => {
+      let error: any;
+      try { await service.setTankGeometry(300, -5001); } catch (e) { error = e; }
+      expect(error).toBeDefined();
+      expect(transport.sendCmd).not.toHaveBeenCalled();
+    });
+
+    it('con valores válidos manda CMD_SET_TANK_GEOMETRY con el offset negativo en complemento a dos (i16 LE) y persiste', async () => {
+      await service.setTankGeometry(450, -250);
+
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_SET_TANK_GEOMETRY);
+      expect(calls.length).toBe(1);
+      const payload = calls[0][1] as Uint8Array;
+      expect(Array.from(payload)).toEqual([...u16LE(450), -250 & 0xFF, (-250 >> 8) & 0xFF]);
+
+      expect(service.tankHeightMm$.value).toBe(450);
+      expect(service.sensorLongitudinalOffsetMm$.value).toBe(-250);
+      expect(localStorage.getItem(PREF_PREFIX + 'app.tankHeightMm')).toBe('450');
+      expect(localStorage.getItem(PREF_PREFIX + 'app.sensorLongitudinalOffsetMm')).toBe('-250');
+    });
+  });
+
+  // ================================================================
+  describe('setHighPressureConfig()', () => {
+    it('exige el margen mínimo HP_MIN_GAP_BAR entre reset/alarm/hardLimit, no solo una desigualdad estricta', async () => {
+      // separación de solo 0.1 bar entre reset y alarm, por debajo de HP_MIN_GAP_BAR=0.5
+      let error: any;
+      try { await service.setHighPressureConfig(16.1, 16.0, 19.5); } catch (e) { error = e; }
+      expect(error).toBeDefined();
+      expect(transport.sendCmd).not.toHaveBeenCalled();
+    });
+
+    it('rechaza hardLimitBar por encima del fondo de escala físico del sensor (60 bar)', async () => {
+      let error: any;
+      try { await service.setHighPressureConfig(58, 57, 60.5); } catch (e) { error = e; }
+      expect(error).toBeDefined();
+      expect(transport.sendCmd).not.toHaveBeenCalled();
+    });
+
+    it('con valores válidos manda CMD_SET_HIGH_PRESSURE_CONFIG (alarm,reset,hardLimit *100, LE) y persiste', async () => {
+      await service.setHighPressureConfig(18.0, 16.0, 19.5);
+
+      const calls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_SET_HIGH_PRESSURE_CONFIG);
+      expect(calls.length).toBe(1);
+      const payload = calls[0][1] as Uint8Array;
+      expect(Array.from(payload)).toEqual([...u16LE(1800), ...u16LE(1600), ...u16LE(1950)]);
+
+      expect(service.highPressureAlarmBar$.value).toBe(18.0);
+      expect(service.highPressureResetBar$.value).toBe(16.0);
+      expect(service.highPressureHardLimitBar$.value).toBe(19.5);
+      expect(localStorage.getItem(PREF_PREFIX + 'app.highPressureAlarmBar')).toBe('18');
+    });
+  });
+
+  // ================================================================
+  describe('loadConfigFromPreferences() — carga y valida lo persistido', () => {
+    function setPref(key: string, value: string) {
+      localStorage.setItem(PREF_PREFIX + 'app.' + key, value);
+    }
+
+    it('carga y aplica los valores simples guardados', async () => {
+      setPref('thresholdCm', '80');
+      setPref('hysteresisCm', '20');
+      setPref('sourceMode', '1');
+      setPref('mode', '1');
+      setPref('enableLeft', '0');
+      setPref('enableRight', '1');
+
+      await service.loadConfigFromPreferences();
+
+      expect(service.thresholdCm$.value).toBe(80);
+      expect(service.hysteresisCm$.value).toBe(20);
+      expect(service.sourceMode$.value).toBe(1);
+      expect(service.mode$.value).toBe(1);
+      expect(service.enabledLeft$.value).toBeFalse();
+      expect(service.enabledRight$.value).toBeTrue();
+    });
+
+    it('recorta (clamp) al cargar los valores fuera de los límites de cordura, igual que hacen los setters', async () => {
+      setPref('thresholdCm', '99999');         // por encima de 300
+      setPref('hysteresisCm', '-5');            // por debajo de 0
+      setPref('activeTimeModo1', '999999999');  // por encima de 600000
+
+      await service.loadConfigFromPreferences();
+
+      expect(service.thresholdCm$.value).toBe(300);
+      expect(service.hysteresisCm$.value).toBe(0);
+      expect(service.activeTimeModo1$.value).toBe(600000);
+    });
+
+    it('umbrales de alta presión: si lo guardado es coherente (margen mínimo respetado), los aplica', async () => {
+      setPref('highPressureAlarmBar', '17');
+      setPref('highPressureResetBar', '15');
+      setPref('highPressureHardLimitBar', '20');
+
+      await service.loadConfigFromPreferences();
+
+      expect(service.highPressureAlarmBar$.value).toBe(17);
+      expect(service.highPressureResetBar$.value).toBe(15);
+      expect(service.highPressureHardLimitBar$.value).toBe(20);
+    });
+
+    it('umbrales de alta presión incoherentes (dato corrupto o de una versión antigua): se ignoran los tres y se mantienen los valores por defecto', async () => {
+      const defaultAlarm = service.highPressureAlarmBar$.value;
+      const defaultReset = service.highPressureResetBar$.value;
+      const defaultHard  = service.highPressureHardLimitBar$.value;
+
+      setPref('highPressureAlarmBar', '16');
+      setPref('highPressureResetBar', '16'); // sin margen: alarm - reset = 0 < HP_MIN_GAP_BAR
+      setPref('highPressureHardLimitBar', '19.5');
+
+      await service.loadConfigFromPreferences();
+
+      expect(service.highPressureAlarmBar$.value).toBe(defaultAlarm);
+      expect(service.highPressureResetBar$.value).toBe(defaultReset);
+      expect(service.highPressureHardLimitBar$.value).toBe(defaultHard);
+    });
+
+    it('geometría del depósito: dentro de los límites de cordura física, se aplica', async () => {
+      setPref('tankHeightMm', '450');
+      setPref('sensorLongitudinalOffsetMm', '-300');
+
+      await service.loadConfigFromPreferences();
+
+      expect(service.tankHeightMm$.value).toBe(450);
+      expect(service.sensorLongitudinalOffsetMm$.value).toBe(-300);
+    });
+
+    it('geometría del depósito: fuera de los límites de cordura física, se ignora y mantiene el valor por defecto', async () => {
+      const defaultHeight = service.tankHeightMm$.value;
+      setPref('tankHeightMm', '50'); // por debajo de 100
+
+      await service.loadConfigFromPreferences();
+
+      expect(service.tankHeightMm$.value).toBe(defaultHeight);
+    });
+  });
+
+  // ================================================================
+  describe('saveConfigToPreferences() — formato de lo persistido', () => {
+    it('guarda litersPerMin con un decimal fijo y numApplicators/grPerSec redondeados', async () => {
+      service.litersPerMin$.next(1.2345);
+      service.numApplicators$.next(3.6);
+      service.grPerSec$.next(99.5);
+
+      await service.saveConfigToPreferences();
+
+      expect(localStorage.getItem(PREF_PREFIX + 'app.litersPerMin')).toBe('1.2');
+      expect(localStorage.getItem(PREF_PREFIX + 'app.numApplicators')).toBe('4');
+      expect(localStorage.getItem(PREF_PREFIX + 'app.grPerSec')).toBe('100');
+    });
+
+    it('guarda enabledLeft$/enabledRight$ como "1"/"0"', async () => {
+      service.enabledLeft$.next(true);
+      service.enabledRight$.next(false);
+
+      await service.saveConfigToPreferences();
+
+      expect(localStorage.getItem(PREF_PREFIX + 'app.enableLeft')).toBe('1');
+      expect(localStorage.getItem(PREF_PREFIX + 'app.enableRight')).toBe('0');
+    });
+
+    it('un round-trip save -> load conserva los valores', async () => {
+      service.thresholdCm$.next(123);
+      service.retardoEntradaDist$.next(4500);
+      service.activeTimeModo1$.next(2500);
+
+      await service.saveConfigToPreferences();
+
+      // Se "desordena" en memoria para comprobar que loadConfigFromPreferences()
+      // de verdad relee de Preferences y no que el valor nunca cambió.
+      service.thresholdCm$.next(5);
+      service.retardoEntradaDist$.next(0);
+      service.activeTimeModo1$.next(0);
+
+      await service.loadConfigFromPreferences();
+
+      expect(service.thresholdCm$.value).toBe(123);
+      expect(service.retardoEntradaDist$.value).toBe(4500);
+      expect(service.activeTimeModo1$.value).toBe(2500);
+    });
   });
 });
