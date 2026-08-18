@@ -525,22 +525,38 @@ export class BleTransportService {
     const seq   = this.nextSeq();
     const frame = this.buildFrame(cmdType, seq, payload);
 
+    let entry!: PendingCommand;
     const p = new Promise<void>((resolve, reject) => {
-      const entry: PendingCommand = { resolve, reject, cmdType, seq, timer: null };
+      entry = { resolve, reject, cmdType, seq, timer: null };
       entry.timer = setTimeout(() => {
         this.queue = this.queue.filter(x => x.seq !== seq);
         reject('ACK timeout');
       }, timeoutMs);
       this.queue.push(entry);
     });
+    // El timer de ACK arranca antes del write y puede ganarle la carrera a
+    // writeBytes() si este tarda casi tanto como el propio timeout de ACK
+    // (p.ej. en el test de WRITE_TIMEOUT, donde ambos son 3000ms). Si eso
+    // pasa, p se rechaza mientras todavía estamos "await"-ando writeBytes(),
+    // sin ningún handler enganchado aún -> "Uncaught (in promise)". Este
+    // catch mudo solo sirve para marcarla como manejada; no consume el valor
+    // real, que sigue llegando intacto a quien haga `await sendCmdInternal()`.
+    p.catch(() => {});
 
     try {
       await this.writeBytes(frame);
     } catch (e) {
-      // El write falló (o hizo timeout) antes de llegar a mandarse: retirar
-      // la entrada pendiente ya insertada en la cola, para no dejarla
-      // colgando hasta que su propio timer de ACK dispare más tarde.
+      // Fix (encontrado escribiendo el test de WRITE_TIMEOUT): el write
+      // falló (o hizo timeout) antes de llegar a mandarse — retirar la
+      // entrada pendiente ya insertada en la cola NO bastaba: el propio
+      // temporizador de ACK (entry.timer, armado más arriba) seguía vivo y
+      // disparaba de todos modos pasado su timeoutMs, haciendo reject()
+      // sobre una `p` ya huérfana (este catch va a relanzar por su cuenta,
+      // nadie más espera ya a `p`) — un "Uncaught (in promise)" suelto en
+      // vez de un cuelgue, pero igualmente un timer y un rechazo colgando
+      // sin necesidad. clearTimeout() también aquí, no solo el filtrado.
       this.queue = this.queue.filter(x => x.seq !== seq);
+      clearTimeout(entry.timer);
       throw e;
     }
     return p;
