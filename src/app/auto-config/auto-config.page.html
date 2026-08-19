@@ -63,44 +63,54 @@
   <!-- =============== CUADRÍCULA 2×2 =============== -->
   <div class="config-grid">
 
-    <!-- ---- Modo distancia ---- -->
-    <article class="panel" [class.panel-dimmed]="sourceMode !== 0">
+    <!-- ---- Modo distancia ----
+         Fix UX: antes esta card se atenuaba entera (panel-dimmed) en cuanto
+         la fuente era "Entradas PC817", dando a entender que retardo
+         entrada/salida tampoco aplicaban — pero SÍ aplican con PC817
+         (debouncing de la señal continua), solo umbral/histéresis son
+         exclusivos del ultrasonido. Ahora la card se atenúa según el MODO
+         (irrelevante entera solo en temporizado, que tiene su propia card),
+         y dentro, umbral/histéresis se ocultan con PC817 mientras que
+         retardo entrada/salida quedan siempre visibles y activos. -->
+    <article class="panel" [class.panel-dimmed]="mode !== 0">
       <header class="panel-header blue">
         <div class="panel-title"><ion-icon name="pulse-outline"></ion-icon><span>Modo distancia</span></div>
       </header>
 
       <div class="panel-body">
-        <div class="param-row">
-          <div class="param-copy">
-            <span>Umbral</span>
-            <small>Distancia de disparo</small>
+        <ng-container *ngIf="sourceMode === 0">
+          <div class="param-row">
+            <div class="param-copy">
+              <span>Umbral</span>
+              <small>Distancia de disparo</small>
+            </div>
+            <div class="stepper">
+              <button class="step-btn" type="button" (click)="step('thresholdCm', -10)">
+                <ion-icon name="chevron-down-outline"></ion-icon>
+              </button>
+              <button class="step-btn stepper-value" type="button" (click)="promptEditValue('thresholdCm', 'Umbral', 'cm')">{{ thresholdCm }} cm</button>
+              <button class="step-btn" type="button" (click)="step('thresholdCm', 10)">
+                <ion-icon name="chevron-up-outline"></ion-icon>
+              </button>
+            </div>
           </div>
-          <div class="stepper">
-            <button class="step-btn" type="button" (click)="step('thresholdCm', -5)">
-              <ion-icon name="chevron-down-outline"></ion-icon>
-            </button>
-            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('thresholdCm', 'Umbral', 'cm')">{{ thresholdCm }} cm</button>
-            <button class="step-btn" type="button" (click)="step('thresholdCm', 5)">
-              <ion-icon name="chevron-up-outline"></ion-icon>
-            </button>
-          </div>
-        </div>
 
-        <div class="param-row">
-          <div class="param-copy">
-            <span>Histéresis</span>
-            <small>Margen anti-rebote</small>
+          <div class="param-row">
+            <div class="param-copy">
+              <span>Histéresis</span>
+              <small>Margen anti-rebote</small>
+            </div>
+            <div class="stepper">
+              <button class="step-btn" type="button" (click)="step('hysteresisCm', -10)">
+                <ion-icon name="chevron-down-outline"></ion-icon>
+              </button>
+              <button class="step-btn stepper-value" type="button" (click)="promptEditValue('hysteresisCm', 'Histéresis', 'cm')">{{ hysteresisCm }} cm</button>
+              <button class="step-btn" type="button" (click)="step('hysteresisCm', 10)">
+                <ion-icon name="chevron-up-outline"></ion-icon>
+              </button>
+            </div>
           </div>
-          <div class="stepper">
-            <button class="step-btn" type="button" (click)="step('hysteresisCm', -1)">
-              <ion-icon name="chevron-down-outline"></ion-icon>
-            </button>
-            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('hysteresisCm', 'Histéresis', 'cm')">{{ hysteresisCm }} cm</button>
-            <button class="step-btn" type="button" (click)="step('hysteresisCm', 1)">
-              <ion-icon name="chevron-up-outline"></ion-icon>
-            </button>
-          </div>
-        </div>
+        </ng-container>
 
         <div class="param-row">
           <div class="param-copy">
@@ -136,7 +146,7 @@
 
         <div class="info-note" *ngIf="sourceMode !== 0">
           <ion-icon name="warning-outline"></ion-icon>
-          Umbral e histéresis se ignoran: la fuente activa es "Entradas PC817".
+          Fuente activa: "Entradas PC817" — umbral e histéresis no aplican, el retardo de entrada/salida sí.
         </div>
       </div>
     </article>
@@ -170,11 +180,11 @@
             <small>Duración de la activación</small>
           </div>
           <div class="stepper">
-            <button class="step-btn" type="button" (click)="step('activeTimeModo1', -1000)">
+            <button class="step-btn" type="button" (click)="step('activeTimeModo1', -250)">
               <ion-icon name="chevron-down-outline"></ion-icon>
             </button>
             <button class="step-btn stepper-value" type="button" (click)="promptEditValue('activeTimeModo1', 'Tiempo activo', 'sg', 0.001)">{{ activeTimeModo1 / 1000 | number:'1.2-2' }} sg</button>
-            <button class="step-btn" type="button" (click)="step('activeTimeModo1', 1000)">
+            <button class="step-btn" type="button" (click)="step('activeTimeModo1', 250)">
               <ion-icon name="chevron-up-outline"></ion-icon>
             </button>
           </div>

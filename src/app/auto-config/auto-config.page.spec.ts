@@ -204,6 +204,53 @@ describe('AutoConfigPage', () => {
   });
 
   // ================================================================
+  // Fix UX: antes la card "Modo distancia" se atenuaba entera en cuanto la
+  // fuente era PC817 (panel-dimmed según sourceMode), dando a entender que
+  // retardo entrada/salida tampoco aplicaban — pero SÍ aplican con PC817
+  // (debouncing de la señal continua), solo umbral/histéresis son
+  // exclusivos del ultrasonido. Se prueba a nivel de DOM porque el cambio
+  // en sí es sobre qué se muestra/oculta, no lógica de negocio nueva.
+  describe('card "Modo distancia" — visibilidad según fuente y modo', () => {
+    /** El primer .panel del grid es siempre "Modo distancia" (ver el .html). */
+    function renderDistanciaPanel(sourceMode: 0 | 1, mode: 0 | 1) {
+      const fixture = TestBed.createComponent(AutoConfigPage);
+      const c = fixture.componentInstance;
+      c.sourceMode = sourceMode;
+      c.mode = mode;
+      fixture.detectChanges();
+      return {
+        text: (fixture.nativeElement as HTMLElement).textContent || '',
+        panel: fixture.nativeElement.querySelector('.panel') as HTMLElement,
+      };
+    }
+
+    it('PC817 + continuo: oculta umbral/histéresis pero muestra retardo entrada/salida, sin atenuar la card', () => {
+      const { text, panel } = renderDistanciaPanel(1, 0);
+
+      expect(text).toContain('Retardo entrada');
+      expect(text).toContain('Retardo salida');
+      expect(text).not.toContain('Distancia de disparo'); // subtítulo de Umbral
+      expect(text).not.toContain('Margen anti-rebote');   // subtítulo de Histéresis
+      expect(panel.classList.contains('panel-dimmed')).toBeFalse();
+    });
+
+    it('ultrasonido + continuo: muestra los 4 parámetros (umbral, histéresis y los dos retardos)', () => {
+      const { text, panel } = renderDistanciaPanel(0, 0);
+
+      expect(text).toContain('Distancia de disparo');
+      expect(text).toContain('Margen anti-rebote');
+      expect(text).toContain('Retardo entrada');
+      expect(text).toContain('Retardo salida');
+      expect(panel.classList.contains('panel-dimmed')).toBeFalse();
+    });
+
+    it('modo temporizado: la card "Modo distancia" se atenúa entera, con cualquier fuente', () => {
+      expect(renderDistanciaPanel(0, 1).panel.classList.contains('panel-dimmed')).toBeTrue();
+      expect(renderDistanciaPanel(1, 1).panel.classList.contains('panel-dimmed')).toBeTrue();
+    });
+  });
+
+  // ================================================================
   describe('applyConfig()', () => {
     it('sin conexión: no llama a ningún método del servicio y muestra un toast de error', async () => {
       bt.isConnected$.next(false);
