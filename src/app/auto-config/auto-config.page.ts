@@ -99,6 +99,25 @@ export class AutoConfigPage {
   highPressureSensorFault$ = this.bt.highPressureSensorFault$;
 
   saving           = false;
+
+  // Fix UX: antes "Aplicar" reenviaba SIEMPRE los tres comandos (config
+  // general, geometría del depósito, límites de alta presión) aunque solo
+  // se hubiera tocado un valor de uno de ellos — tres paneles sin relación
+  // entre sí forzados por un único botón. Ahora cada grupo se marca "sucio"
+  // solo cuando de verdad cambia algo suyo (ver markDirtyFor(), llamado
+  // desde step() y promptEditValue()) y applyConfig() solo manda al Arduino
+  // los grupos realmente modificados. Se resetean al cargar valores frescos
+  // del servicio en ionViewWillEnter(), y cada uno se limpia solo tras
+  // aplicarse con éxito (si falla, se queda "sucio" para poder reintentar
+  // sin tener que volver a tocar el campo).
+  private generalDirty  = false;
+  private geometryDirty = false;
+  private pressureDirty = false;
+
+  get hasPendingChanges(): boolean {
+    return this.generalDirty || this.geometryDirty || this.pressureDirty;
+  }
+
   calibrating      = false;
   calibratingFull  = false;
   calibratingTiltRef   = false;
@@ -187,6 +206,11 @@ export class AutoConfigPage {
     this.pressureLowLimitBar  = this.round1(this.bt.highPressureResetBar$.value);
     this.pressureHighLimitBar = this.round1(this.bt.highPressureAlarmBar$.value);
 
+    // Se acaba de cargar la verdad del servicio: nada está "sucio" todavía.
+    this.generalDirty  = false;
+    this.geometryDirty = false;
+    this.pressureDirty = false;
+
     await this.loadLocalParams();
   }
 
@@ -207,13 +231,53 @@ export class AutoConfigPage {
     return Math.round(v * 10) / 10;
   }
 
-  toggleSourceMode(ev: any) { this.sourceMode = ev.detail.checked ? 1 : 0; }
-  toggleMode(ev: any)       { this.mode       = ev.detail.checked ? 1 : 0; }
+  toggleSourceMode(ev: any) { this.sourceMode = ev.detail.checked ? 1 : 0; this.generalDirty = true; }
+  toggleMode(ev: any)       { this.mode       = ev.detail.checked ? 1 : 0; this.generalDirty = true; }
 
   step(param: string, amount: number) {
     const current  = (this as any)[param];
     const newValue = (Number(current) || 0) + amount;
+    this.clampAndSet(param, newValue);
+    this.markDirtyFor(param);
+  }
 
+  /**
+   * Marca como "sucio" el grupo (config general / geometría / alta presión)
+   * al que pertenece `param`, para que applyConfig() sepa qué comandos
+   * tiene de verdad que reenviar. depositoCap no marca ningún grupo: es
+   * puramente local (solo Preferences vía saveLocalParams()), nunca se
+   * manda al Arduino.
+   */
+  private markDirtyFor(param: string): void {
+    switch (param) {
+      case 'thresholdCm':
+      case 'hysteresisCm':
+      case 'retardoEntradaDist':
+      case 'retardoSalidaDist':
+      case 'retardoEntradaTemp':
+      case 'activeTimeModo1':
+        this.generalDirty = true;
+        break;
+      case 'tankHeightMm':
+        this.geometryDirty = true;
+        break;
+      case 'pressureLowLimitBar':
+      case 'pressureHighLimitBar':
+        this.pressureDirty = true;
+        break;
+    }
+  }
+
+  /**
+   * Aplica el mismo clamp de cordura que antes vivía dentro de step(), pero
+   * a partir de un valor ABSOLUTO en vez de un incremento — extraído para
+   * que promptEditValue() (entrada numérica directa, ver más abajo) respete
+   * exactamente los mismos límites que los steppers +/-, incluidos los
+   * cruzados entre pressureLowLimitBar/pressureHighLimitBar. Sin esto,
+   * escribir un valor a mano podría dejar los dos límites de presión sin el
+   * margen mínimo que exige el firmware.
+   */
+  private clampAndSet(param: string, newValue: number): void {
     switch (param) {
       case 'thresholdCm':
         (this as any)[param] = Math.max(5, Math.min(300, Math.round(newValue)));
@@ -264,6 +328,54 @@ export class AutoConfigPage {
     }
   }
 
+  /**
+   * Fix UX: los steppers +/- son perfectos para ajustes finos, pero para la
+   * puesta en marcha inicial (o corregir un valor muy alejado) suponen
+   * decenas de toques — llegar de 5 a 300 cm en pasos de 5 son hasta 59
+   * toques, la capacidad del depósito en pasos de 50 L otro tanto. Tocar el
+   * propio valor (no los botones +/-) abre un teclado numérico para
+   * escribirlo directamente. Pasa por el MISMO clamp que step()
+   * (clampAndSet), así que nunca puede dejar un valor fuera de rango ni
+   * incoherente con el relacionado (p.ej. los límites de presión).
+   *
+   * `scale` convierte entre el valor mostrado y el almacenado para los
+   * parámetros guardados en ms pero mostrados en segundos (p.ej.
+   * scale=0.001 para retardoEntradaDist): mostrado = almacenado × scale.
+   */
+  async promptEditValue(param: string, label: string, unit: string, scale: number = 1): Promise<void> {
+    const stored = Number((this as any)[param]) || 0;
+    const displayValue = scale === 1 ? stored : Math.round(stored * scale * 100) / 100;
+
+    const alert = await this.alertController.create({
+      header: label,
+      inputs: [{
+        name: 'value',
+        type: 'number',
+        value: displayValue,
+        placeholder: unit,
+      }],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Aceptar',
+          role: 'confirm',
+          handler: (data: { value: string }) => {
+            const typed = Number(data?.value);
+            // Entrada no numérica o vacía: se deja el diálogo abierto (return
+            // false) en vez de aplicar cualquier cosa o cerrarlo en silencio
+            // dando la falsa impresión de que se guardó.
+            if (!Number.isFinite(typed)) return false;
+            const raw = scale === 1 ? typed : typed / scale;
+            this.clampAndSet(param, raw);
+            this.markDirtyFor(param);
+            return true;
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
+
   private validateConfig(): string | null {
     if (!(this.sourceMode === 0 || this.sourceMode === 1))
       return 'Fuente de disparo inválida';
@@ -312,45 +424,64 @@ export class AutoConfigPage {
         throw new Error('Conecta primero el dispositivo Bluetooth');
       }
 
+      // Fix UX: antes se mandaban SIEMPRE los tres comandos aunque el
+      // usuario solo hubiera tocado un valor de uno de los tres grupos —
+      // ver la nota junto a generalDirty/geometryDirty/pressureDirty más
+      // arriba. Sin cambios pendientes no hay nada que reenviar (el botón
+      // ya está deshabilitado en este caso vía hasPendingChanges, esto es
+      // la misma guarda por si se llama a applyConfig() desde otro sitio
+      // en el futuro) — se comprueba DESPUÉS de la conexión a propósito:
+      // "conecta primero" debe seguir avisando aunque no haya nada sucio.
+      if (!this.hasPendingChanges) return;
+
       const err = this.validateConfig();
       if (err) throw new Error(err);
 
-      try {
-        await this.bt.applyConfigOnce({
-          sourceMode:        this.sourceMode,
-          mode:              this.mode,
-          thresholdCm:       this.thresholdCm,
-          hysteresisCm:      this.hysteresisCm,
-          retardoEntradaDist: this.retardoEntradaDist,
-          retardoSalidaDist:  this.retardoSalidaDist,
-          retardoEntradaTemp: this.retardoEntradaTemp,
-          activeTimeModo1:    this.activeTimeModo1,
-        });
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`No se pudo aplicar la configuración general: ${msg}`);
+      if (this.generalDirty) {
+        try {
+          await this.bt.applyConfigOnce({
+            sourceMode:        this.sourceMode,
+            mode:              this.mode,
+            thresholdCm:       this.thresholdCm,
+            hysteresisCm:      this.hysteresisCm,
+            retardoEntradaDist: this.retardoEntradaDist,
+            retardoSalidaDist:  this.retardoSalidaDist,
+            retardoEntradaTemp: this.retardoEntradaTemp,
+            activeTimeModo1:    this.activeTimeModo1,
+          });
+          this.generalDirty = false;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(`No se pudo aplicar la configuración general: ${msg}`);
+        }
       }
 
-      try {
-        await this.bt.setTankGeometry(this.tankHeightMm, this.bt.sensorLongitudinalOffsetMm$.value);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`No se pudo aplicar la geometría del depósito: ${msg}`);
+      if (this.geometryDirty) {
+        try {
+          await this.bt.setTankGeometry(this.tankHeightMm, this.bt.sensorLongitudinalOffsetMm$.value);
+          this.geometryDirty = false;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(`No se pudo aplicar la geometría del depósito: ${msg}`);
+        }
       }
 
-      try {
-        const derivedHardLimit = Math.min(
-          this.pressureSensorMaxBar,
-          this.pressureHighLimitBar + this.HARD_LIMIT_MARGIN_BAR
-        );
-        await this.bt.setHighPressureConfig(
-          this.pressureHighLimitBar,
-          this.pressureLowLimitBar,
-          derivedHardLimit,
-        );
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`No se pudieron aplicar los límites de alta presión: ${msg}`);
+      if (this.pressureDirty) {
+        try {
+          const derivedHardLimit = Math.min(
+            this.pressureSensorMaxBar,
+            this.pressureHighLimitBar + this.HARD_LIMIT_MARGIN_BAR
+          );
+          await this.bt.setHighPressureConfig(
+            this.pressureHighLimitBar,
+            this.pressureLowLimitBar,
+            derivedHardLimit,
+          );
+          this.pressureDirty = false;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(`No se pudieron aplicar los límites de alta presión: ${msg}`);
+        }
       }
 
       await this.saveLocalParams();

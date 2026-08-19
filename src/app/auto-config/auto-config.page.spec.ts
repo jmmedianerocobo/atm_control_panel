@@ -99,6 +99,17 @@ class FakeAlertController {
     // cadena async interna (que solo await-ea spies ya resueltos) termine.
     await new Promise(r => setTimeout(r, 0));
   }
+
+  /** Igual que pressConfirmButton(), pero pasando `data` al handler del
+   *  botón 'confirm' — para los diálogos con `inputs` (ver
+   *  promptEditValue() en el .ts). Devuelve lo que el propio handler
+   *  devuelva: Ionic usa `false` para dejar el diálogo abierto en vez de
+   *  cerrarlo (entrada inválida), cualquier otra cosa lo cierra. */
+  pressConfirmButtonWithData(data: any): any {
+    const dialog = this.confirmDialogs[this.confirmDialogs.length - 1];
+    const btn = dialog.opts.buttons.find((b: any) => b.role === 'confirm');
+    return btn?.handler?.(data);
+  }
 }
 
 describe('AutoConfigPage', () => {
@@ -121,6 +132,16 @@ describe('AutoConfigPage', () => {
   });
 
   afterEach(() => localStorage.clear());
+
+  /** Simula "el usuario ha tocado algo en los tres grupos" sin depender de
+   *  qué stepper concreto se use — para los tests centrados en el propio
+   *  cascade/reentrancia de applyConfig(), no en qué marca sucio cada
+   *  campo (eso lo cubre el describe('marcado de cambios pendientes...')). */
+  function markAllDirty() {
+    (component as any).generalDirty  = true;
+    (component as any).geometryDirty = true;
+    (component as any).pressureDirty = true;
+  }
 
   it('se crea y renderiza la plantilla sin errores', () => {
     const fixture = TestBed.createComponent(AutoConfigPage);
@@ -197,6 +218,7 @@ describe('AutoConfigPage', () => {
     it('config inválida (p.ej. thresholdCm fuera de rango con sourceMode=0): no llama a ningún método del servicio', async () => {
       component.sourceMode = 0;
       component.thresholdCm = 999; // fuera de [5,300]
+      (component as any).generalDirty = true; // simula haber tocado el campo (ver step()/promptEditValue())
       await component.applyConfig();
 
       expect(bt.applyConfigOnce).not.toHaveBeenCalled();
@@ -212,6 +234,7 @@ describe('AutoConfigPage', () => {
       component.pressureLowLimitBar  = 16.0;
       component.pressureHighLimitBar = 18.0;
       component.depositoCap = 3000;
+      markAllDirty();
 
       await component.applyConfig();
 
@@ -225,9 +248,11 @@ describe('AutoConfigPage', () => {
       expect(localStorage.getItem(PREF_PREFIX + 'cfg.depositoCap')).toBe('3000');
       expect(alertCtrl.toasts[0].opts.message).toContain('correctamente');
       expect(component.saving).toBeFalse();
+      expect(component.hasPendingChanges).toBeFalse(); // los tres grupos quedan limpios tras el éxito
     });
 
     it('si applyConfigOnce falla, NO intenta geometría ni alta presión, y el toast identifica el paso que falló', async () => {
+      markAllDirty();
       bt.applyConfigOnce.and.callFake(() => Promise.reject(new Error('sin ACK')));
 
       await component.applyConfig();
@@ -239,6 +264,7 @@ describe('AutoConfigPage', () => {
     });
 
     it('si setTankGeometry falla, NO intenta alta presión, y el toast identifica el paso que falló', async () => {
+      markAllDirty();
       bt.setTankGeometry.and.callFake(() => Promise.reject(new Error('BAD_VALUE')));
 
       await component.applyConfig();
@@ -250,6 +276,7 @@ describe('AutoConfigPage', () => {
     });
 
     it('reentrancia: una segunda llamada mientras la primera sigue en curso se ignora sin llamar de nuevo al servicio', async () => {
+      markAllDirty();
       let resolveApply!: () => void;
       bt.applyConfigOnce.and.callFake(() => new Promise<void>(res => { resolveApply = res; }));
 
@@ -262,6 +289,143 @@ describe('AutoConfigPage', () => {
 
       expect(bt.applyConfigOnce).toHaveBeenCalledTimes(1);
       expect(component.saving).toBeFalse();
+    });
+  });
+
+  // ================================================================
+  describe('marcado de cambios pendientes (generalDirty/geometryDirty/pressureDirty)', () => {
+    it('recién creado, sin cambios pendientes', () => {
+      expect(component.hasPendingChanges).toBeFalse();
+    });
+
+    it('step() sobre un parámetro de "config general" solo manda applyConfigOnce, no geometría ni presión', async () => {
+      component.step('thresholdCm', 5);
+      expect(component.hasPendingChanges).toBeTrue();
+
+      await component.applyConfig();
+
+      expect(bt.applyConfigOnce).toHaveBeenCalled();
+      expect(bt.setTankGeometry).not.toHaveBeenCalled();
+      expect(bt.setHighPressureConfig).not.toHaveBeenCalled();
+    });
+
+    it('step() sobre tankHeightMm (geometría) solo manda setTankGeometry', async () => {
+      component.step('tankHeightMm', 10);
+      await component.applyConfig();
+
+      expect(bt.setTankGeometry).toHaveBeenCalled();
+      expect(bt.applyConfigOnce).not.toHaveBeenCalled();
+      expect(bt.setHighPressureConfig).not.toHaveBeenCalled();
+    });
+
+    it('step() sobre un límite de presión solo manda setHighPressureConfig', async () => {
+      component.step('pressureLowLimitBar', -0.5);
+      await component.applyConfig();
+
+      expect(bt.setHighPressureConfig).toHaveBeenCalled();
+      expect(bt.applyConfigOnce).not.toHaveBeenCalled();
+      expect(bt.setTankGeometry).not.toHaveBeenCalled();
+    });
+
+    it('depositoCap es puramente local: step() sobre él NO marca ningún grupo como pendiente', () => {
+      component.step('depositoCap', 50);
+      expect(component.hasPendingChanges).toBeFalse();
+    });
+
+    it('toggleSourceMode()/toggleMode() marcan "config general" como pendiente', () => {
+      component.toggleSourceMode({ detail: { checked: true } });
+      expect(component.hasPendingChanges).toBeTrue();
+    });
+
+    it('applyConfig() sin cambios pendientes no llama a ningún método del servicio', async () => {
+      await component.applyConfig();
+      expect(bt.applyConfigOnce).not.toHaveBeenCalled();
+      expect(bt.setTankGeometry).not.toHaveBeenCalled();
+      expect(bt.setHighPressureConfig).not.toHaveBeenCalled();
+    });
+
+    it('tras aplicar con éxito, el grupo aplicado deja de estar sucio — una segunda pulsación sin más cambios no reenvía nada', async () => {
+      component.step('thresholdCm', 5);
+      await component.applyConfig();
+      expect(bt.applyConfigOnce).toHaveBeenCalledTimes(1);
+
+      await component.applyConfig(); // sin tocar nada más
+
+      expect(bt.applyConfigOnce).toHaveBeenCalledTimes(1); // no ha vuelto a mandarlo
+    });
+
+    it('si falla, el grupo se queda sucio — reintentar sin tocar el campo otra vez sí reenvía', async () => {
+      component.step('thresholdCm', 5);
+      bt.applyConfigOnce.and.callFake(() => Promise.reject(new Error('sin ACK')));
+      await component.applyConfig();
+      expect(component.hasPendingChanges).toBeTrue(); // sigue sucio, no se perdió el cambio
+
+      bt.applyConfigOnce.and.resolveTo(undefined); // esta vez el enlace responde
+      await component.applyConfig();
+
+      expect(bt.applyConfigOnce).toHaveBeenCalledTimes(2);
+      expect(component.hasPendingChanges).toBeFalse();
+    });
+
+    it('ionViewWillEnter() resetea los tres flags al cargar valores frescos del servicio', async () => {
+      component.step('thresholdCm', 5);
+      expect(component.hasPendingChanges).toBeTrue();
+
+      await component.ionViewWillEnter();
+
+      expect(component.hasPendingChanges).toBeFalse();
+    });
+  });
+
+  // ================================================================
+  describe('promptEditValue() — entrada numérica directa (alternativa a los steppers +/-)', () => {
+    it('pre-rellena el diálogo con el valor actual', async () => {
+      component.thresholdCm = 123;
+      await component.promptEditValue('thresholdCm', 'Umbral', 'cm');
+
+      expect(alertCtrl.confirmDialogs.length).toBe(1);
+      expect(alertCtrl.confirmDialogs[0].opts.inputs[0].value).toBe(123);
+    });
+
+    it('convierte el valor mostrado según `scale` (ms almacenados, segundos mostrados)', async () => {
+      component.retardoEntradaDist = 5000; // ms
+      await component.promptEditValue('retardoEntradaDist', 'Retardo entrada', 'sg', 0.001);
+
+      expect(alertCtrl.confirmDialogs[0].opts.inputs[0].value).toBe(5); // 5000ms -> 5sg mostrados
+    });
+
+    it('al confirmar con un valor válido, aplica el mismo clamp que step() y marca el grupo sucio', async () => {
+      await component.promptEditValue('thresholdCm', 'Umbral', 'cm');
+      const result = alertCtrl.pressConfirmButtonWithData({ value: '999' }); // fuera de rango
+
+      expect(result).toBeTrue();
+      expect(component.thresholdCm).toBe(300); // recortado al máximo, igual que step()
+      expect(component.hasPendingChanges).toBeTrue();
+    });
+
+    it('convierte de vuelta el valor escrito según `scale` antes de guardarlo', async () => {
+      await component.promptEditValue('retardoEntradaDist', 'Retardo entrada', 'sg', 0.001);
+      alertCtrl.pressConfirmButtonWithData({ value: '3.5' }); // 3.5 sg escritos
+
+      expect(component.retardoEntradaDist).toBe(3500); // almacenado en ms
+    });
+
+    it('con entrada no numérica, deja el diálogo abierto (return false) y no toca el valor', async () => {
+      component.thresholdCm = 80;
+      await component.promptEditValue('thresholdCm', 'Umbral', 'cm');
+      const result = alertCtrl.pressConfirmButtonWithData({ value: 'abc' });
+
+      expect(result).toBeFalse();
+      expect(component.thresholdCm).toBe(80);
+      expect(component.hasPendingChanges).toBeFalse();
+    });
+
+    it('sobre depositoCap (puramente local) no marca ningún grupo como pendiente', async () => {
+      await component.promptEditValue('depositoCap', 'Capacidad del depósito', 'L');
+      alertCtrl.pressConfirmButtonWithData({ value: '3000' });
+
+      expect(component.depositoCap).toBe(3000);
+      expect(component.hasPendingChanges).toBeFalse();
     });
   });
 

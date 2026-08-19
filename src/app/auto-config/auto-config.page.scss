@@ -245,14 +245,6 @@ ion-toolbar {
   gap: 3px;
 }
 
-.stepper strong {
-  width: clamp(50px, 7vw, 75px);
-  font-size: clamp(9px, 1.65vh, 12px);
-  font-weight: 800;
-  text-align: center;
-  color: var(--text);
-}
-
 .step-btn {
   display: flex;
   align-items: center;
@@ -266,6 +258,23 @@ ion-toolbar {
   background: rgba(64, 156, 255, 0.09);
   border: 1px solid rgba(64, 156, 255, 0.26);
   border-radius: 6px;
+}
+
+/* Fix UX: antes era un <strong> puramente informativo entre los dos
+   botones +/-; llegar de 5 a 300 cm en pasos de 5 son hasta 59 toques. Ahora
+   es en sí mismo un botón (promptEditValue(), ver el .ts) que abre un
+   teclado numérico para escribir el valor directamente. El borde discontinuo
+   (en vez del sólido de .step-btn) es la señal visual de "esto se puede
+   tocar para escribir", distinta del borde sólido de los +/- para no
+   confundir ambos tipos de control. */
+.stepper-value {
+  width: clamp(50px, 7vw, 75px);
+  font-size: clamp(9px, 1.65vh, 12px);
+  font-weight: 800;
+  text-align: center;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed rgba(255, 255, 255, 0.32);
 }
 
 .test-actions {
@@ -549,7 +558,7 @@ ion-toolbar {
    de valor algo mayor que necesitan "18.0 bar"/"60.0 bar" frente a valores
    más cortos como "100 cm".
  */
-.pressure-limit-row .stepper strong {
+.pressure-limit-row .stepper-value {
   width: clamp(76px, 10vw, 104px);
 }
 
@@ -645,7 +654,7 @@ ion-toolbar {
   font-size: clamp(22px, 4.5vh, 34px);
 }
 
-.config-grid .pressure-limit-row .stepper strong {
+.config-grid .pressure-limit-row .stepper-value {
   width: clamp(68px, 8vw, 90px);
 }
 

@@ -20,7 +20,7 @@
         class="save-action"
         fill="solid"
         color="primary"
-        [disabled]="saving || !(bt.isConnected$ | async)"
+        [disabled]="saving || !(bt.isConnected$ | async) || !hasPendingChanges"
         (click)="applyConfig()">
         <ion-icon slot="start" name="save-outline"></ion-icon>
         {{ saving ? 'Aplicando…' : 'Aplicar' }}
@@ -79,7 +79,7 @@
             <button class="step-btn" type="button" (click)="step('thresholdCm', -5)">
               <ion-icon name="chevron-down-outline"></ion-icon>
             </button>
-            <strong>{{ thresholdCm }} cm</strong>
+            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('thresholdCm', 'Umbral', 'cm')">{{ thresholdCm }} cm</button>
             <button class="step-btn" type="button" (click)="step('thresholdCm', 5)">
               <ion-icon name="chevron-up-outline"></ion-icon>
             </button>
@@ -95,7 +95,7 @@
             <button class="step-btn" type="button" (click)="step('hysteresisCm', -1)">
               <ion-icon name="chevron-down-outline"></ion-icon>
             </button>
-            <strong>{{ hysteresisCm }} cm</strong>
+            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('hysteresisCm', 'Histéresis', 'cm')">{{ hysteresisCm }} cm</button>
             <button class="step-btn" type="button" (click)="step('hysteresisCm', 1)">
               <ion-icon name="chevron-up-outline"></ion-icon>
             </button>
@@ -111,7 +111,7 @@
             <button class="step-btn" type="button" (click)="step('retardoEntradaDist', -250)">
               <ion-icon name="chevron-down-outline"></ion-icon>
             </button>
-            <strong>{{ retardoEntradaDist / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('retardoEntradaDist', 'Retardo entrada', 'sg', 0.001)">{{ retardoEntradaDist / 1000 | number:'1.2-2' }} sg</button>
             <button class="step-btn" type="button" (click)="step('retardoEntradaDist', 250)">
               <ion-icon name="chevron-up-outline"></ion-icon>
             </button>
@@ -127,7 +127,7 @@
             <button class="step-btn" type="button" (click)="step('retardoSalidaDist', -250)">
               <ion-icon name="chevron-down-outline"></ion-icon>
             </button>
-            <strong>{{ retardoSalidaDist / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('retardoSalidaDist', 'Retardo salida', 'sg', 0.001)">{{ retardoSalidaDist / 1000 | number:'1.2-2' }} sg</button>
             <button class="step-btn" type="button" (click)="step('retardoSalidaDist', 250)">
               <ion-icon name="chevron-up-outline"></ion-icon>
             </button>
@@ -157,7 +157,7 @@
             <button class="step-btn" type="button" (click)="step('retardoEntradaTemp', -250)">
               <ion-icon name="chevron-down-outline"></ion-icon>
             </button>
-            <strong>{{ retardoEntradaTemp / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('retardoEntradaTemp', 'Retardo entrada (temporizado)', 'sg', 0.001)">{{ retardoEntradaTemp / 1000 | number:'1.2-2' }} sg</button>
             <button class="step-btn" type="button" (click)="step('retardoEntradaTemp', 250)">
               <ion-icon name="chevron-up-outline"></ion-icon>
             </button>
@@ -173,7 +173,7 @@
             <button class="step-btn" type="button" (click)="step('activeTimeModo1', -1000)">
               <ion-icon name="chevron-down-outline"></ion-icon>
             </button>
-            <strong>{{ activeTimeModo1 / 1000 | number:'1.2-2' }} sg</strong>
+            <button class="step-btn stepper-value" type="button" (click)="promptEditValue('activeTimeModo1', 'Tiempo activo', 'sg', 0.001)">{{ activeTimeModo1 / 1000 | number:'1.2-2' }} sg</button>
             <button class="step-btn" type="button" (click)="step('activeTimeModo1', 1000)">
               <ion-icon name="chevron-up-outline"></ion-icon>
             </button>
@@ -235,7 +235,7 @@
                 <button class="step-btn" type="button" (click)="step('depositoCap', -50)">
                   <ion-icon name="chevron-down-outline"></ion-icon>
                 </button>
-                <strong>{{ depositoCap }} L</strong>
+                <button class="step-btn stepper-value" type="button" (click)="promptEditValue('depositoCap', 'Capacidad del depósito', 'L')">{{ depositoCap }} L</button>
                 <button class="step-btn" type="button" (click)="step('depositoCap', 50)">
                   <ion-icon name="chevron-up-outline"></ion-icon>
                 </button>
@@ -248,7 +248,7 @@
                 <button class="step-btn" type="button" (click)="step('tankHeightMm', -10)">
                   <ion-icon name="chevron-down-outline"></ion-icon>
                 </button>
-                <strong>{{ tankHeightMm }} mm</strong>
+                <button class="step-btn stepper-value" type="button" (click)="promptEditValue('tankHeightMm', 'Altura del depósito', 'mm')">{{ tankHeightMm }} mm</button>
                 <button class="step-btn" type="button" (click)="step('tankHeightMm', 10)">
                   <ion-icon name="chevron-up-outline"></ion-icon>
                 </button>
@@ -319,7 +319,7 @@
                 <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', -0.5)">
                   <ion-icon name="chevron-down-outline"></ion-icon>
                 </button>
-                <strong>{{ pressureLowLimitBar | number:'1.1-1' }} bar</strong>
+                <button class="step-btn stepper-value" type="button" (click)="promptEditValue('pressureLowLimitBar', 'Límite inferior de presión', 'bar')">{{ pressureLowLimitBar | number:'1.1-1' }} bar</button>
                 <button class="step-btn" type="button" (click)="step('pressureLowLimitBar', 0.5)">
                   <ion-icon name="chevron-up-outline"></ion-icon>
                 </button>
@@ -335,7 +335,7 @@
                 <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', -0.5)">
                   <ion-icon name="chevron-down-outline"></ion-icon>
                 </button>
-                <strong>{{ pressureHighLimitBar | number:'1.1-1' }} bar</strong>
+                <button class="step-btn stepper-value" type="button" (click)="promptEditValue('pressureHighLimitBar', 'Límite superior de presión', 'bar')">{{ pressureHighLimitBar | number:'1.1-1' }} bar</button>
                 <button class="step-btn" type="button" (click)="step('pressureHighLimitBar', 0.5)">
                   <ion-icon name="chevron-up-outline"></ion-icon>
                 </button>
