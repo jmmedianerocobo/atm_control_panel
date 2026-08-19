@@ -14,19 +14,32 @@
       </div>
     </ion-title>
 
-    <ion-buttons slot="end">
-      <ion-button fill="clear" [disabled]="!(isConnected$ | async)" (click)="refreshStatus()">
+    <!-- Fix UX: 5 acciones solo-icono apretadas en una fila hacían fácil
+         tocar por error "Salir" (la única realmente destructiva del grupo)
+         al ir a por "Bluetooth" o "Ajustes", sobre todo en tablet/campo. Se
+         separa en dos grupos: navegación rutinaria (refrescar/ajustes/
+         bluetooth) y, tras un separador visual con hueco de aire real, la
+         acción de salir — con más margen para que no sea el vecino
+         inmediato de un botón de uso frecuente. aria-label en todos los
+         iconos sin texto, para lectores de pantalla y como referencia del
+         propio nombre de la acción. -->
+    <ion-buttons slot="end" class="toolbar-actions">
+      <ion-button fill="clear" [disabled]="!(isConnected$ | async)" aria-label="Actualizar estado" (click)="refreshStatus()">
         <ion-icon name="refresh-outline"></ion-icon>
       </ion-button>
-      <ion-button fill="clear" (click)="openConfigPage()">
+      <ion-button fill="clear" aria-label="Configuración" (click)="openConfigPage()">
         <ion-icon name="settings-outline"></ion-icon>
       </ion-button>
-      <ion-button fill="clear" (click)="goToBluetoothSettings()">
+      <ion-button fill="clear" aria-label="Ajustes de Bluetooth" (click)="goToBluetoothSettings()">
         <ion-icon name="bluetooth-outline"></ion-icon>
       </ion-button>
-      <ion-button fill="clear" color="danger" aria-label="Salir de la aplicación" (click)="confirmExitApp()">
+
+      <span class="toolbar-divider" aria-hidden="true"></span>
+
+      <ion-button fill="clear" color="danger" class="exit-btn" aria-label="Salir de la aplicación" (click)="confirmExitApp()">
         <ion-icon name="power-outline"></ion-icon>
       </ion-button>
+
       <ion-chip [color]="(isConnected$ | async) ? 'success' : 'danger'">
         <ion-icon [name]="(isConnected$ | async) ? 'bluetooth-outline' : 'close-circle-outline'"></ion-icon>
         <ion-label>{{ (isConnected$ | async) ? 'Conectado' : 'Desconectado' }}</ion-label>

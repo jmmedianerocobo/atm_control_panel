@@ -39,6 +39,22 @@ ion-toolbar {
   color: var(--soft);
 }
 
+/* Fix UX: separación real entre la navegación rutinaria (refrescar/
+   ajustes/bluetooth) y "Salir" — antes eran 5 botones solo-icono contiguos
+   y era fácil tocar el de salir por error alcanzando otro. La línea es
+   deliberadamente sutil (no es una alerta), el hueco de aire es lo que
+   realmente evita el toque accidental. */
+.toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 10px 6px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.exit-btn {
+  margin-inline-start: 2px;
+}
+
 /* ==========================================================
  * CONTENEDOR PRINCIPAL
  * ========================================================== */
