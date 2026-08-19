@@ -1,5 +1,6 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { BehaviorSubject, Subject } from 'rxjs';
+import { Preferences } from '@capacitor/preferences';
 
 import { BluetoothService } from './bluetooth.service';
 import {
@@ -94,6 +95,24 @@ class FakeTransport {
 describe('BluetoothService (fachada de dominio)', () => {
   let service: BluetoothService;
   let transport: FakeTransport;
+
+  // Fix (encontrado con una CI flaky, no reproducible siempre en local):
+  // @capacitor/preferences (Preferences) carga su implementación web con un
+  // import() dinámico REAL la primera vez que se usa — un import de módulo
+  // de verdad, no un microtask — que fakeAsync()/tick() NO puede forzar a
+  // resolverse por mucho margen virtual que se le dé, porque vive fuera del
+  // reloj falso. Si esa PRIMERA llamada a Preferences.get()/.set() de toda
+  // la suite ocurre dentro de un fakeAsync() (p.ej. durante connect(), que
+  // llama a saveConfigToPreferences()), el tick() se queda esperando un
+  // import que nunca "avanza" con el reloj falso, y las aserciones fallan
+  // con recuentos en 0 — exactamente el fallo visto en CI. Precalentar aquí
+  // (fuera de cualquier fakeAsync, con un await real) hace que el import ya
+  // esté cacheado por el navegador para el resto de la suite: a partir de
+  // ahí, cada Preferences.get()/.set() posterior sí es solo una promesa
+  // normal que tick() puede flushear sin problema.
+  beforeAll(async () => {
+    await Preferences.get({ key: '__warmup__' });
+  });
 
   beforeEach(() => {
     // Limpio ANTES de instanciar el servicio: su constructor dispara un
@@ -250,7 +269,14 @@ describe('BluetoothService (fachada de dominio)', () => {
       });
 
       service.connect(TEST_DEVICE);
-      tick(300); // connect() espera 200ms tras requestStatus()/requestRelayStats()
+      // connect() espera 200ms tras requestStatus()/requestRelayStats(), pero
+      // el margen real necesario depende también de saveConfigToPreferences()
+      // al final (Preferences.set() de Capacitor hace un import() dinámico
+      // real, no un simple microtask — fakeAsync no lo controla, así que su
+      // duración de verdad varía con la carga de la máquina). 300ms bastaba
+      // en local pero flaqueó en el runner de CI bajo carga: se sube el
+      // margen bastante por encima de lo estrictamente necesario.
+      tick(2000);
 
       const setEnableCalls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_SET_ENABLE);
       expect(setEnableCalls.length).toBe(1);
@@ -267,7 +293,7 @@ describe('BluetoothService (fachada de dominio)', () => {
       });
 
       service.connect(TEST_DEVICE);
-      tick(300);
+      tick(2000); // mismo margen generoso que arriba, ver nota junto al primer tick(2000)
 
       const setEnableCalls = transport.sendCmd.calls.allArgs().filter(a => a[0] === CMD_SET_ENABLE);
       expect(setEnableCalls.length).toBe(0);
@@ -275,7 +301,7 @@ describe('BluetoothService (fachada de dominio)', () => {
 
     it('llama a transport.adaptToProtocolVersion() al terminar la sincronización', fakeAsync(() => {
       service.connect(TEST_DEVICE);
-      tick(300);
+      tick(2000);
       expect(transport.adaptToProtocolVersion).toHaveBeenCalled();
     }));
   });
@@ -383,7 +409,12 @@ describe('BluetoothService (fachada de dominio)', () => {
       transport.isConnected$.next(true);
 
       transport.reconnectRequested$.next();
-      tick(1200); // 800ms de espera interna de reconnect() + los ~300ms de connect()
+      // 800ms de espera interna de reconnect() + connect() completo (que a su
+      // vez incluye saveConfigToPreferences() al final — ver nota extensa
+      // junto al primer tick(2000) del describe de connect() más arriba
+      // sobre por qué necesita bastante más margen del estrictamente
+      // calculable en un runner de CI cargado).
+      tick(3000);
 
       expect(transport.disconnect).toHaveBeenCalledTimes(1);
       expect(transport.connect).toHaveBeenCalledTimes(1);
@@ -406,7 +437,7 @@ describe('BluetoothService (fachada de dominio)', () => {
       transport.reconnectRequested$.next();
       tick(10); // sigue en curso el primer intento
       transport.reconnectRequested$.next(); // debe ignorarse
-      tick(1200);
+      tick(3000);
 
       expect(transport.disconnect).toHaveBeenCalledTimes(1);
       expect(transport.connect).toHaveBeenCalledTimes(1);

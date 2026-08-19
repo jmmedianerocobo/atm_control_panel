@@ -2,6 +2,7 @@ import { TestBed, fakeAsync, tick, discardPeriodicTasks } from '@angular/core/te
 import { BehaviorSubject } from 'rxjs';
 import { Router, provideRouter } from '@angular/router';
 import { AlertController } from '@ionic/angular/standalone';
+import { Preferences } from '@capacitor/preferences';
 
 import { DistanceViewPage } from './distance-view.page';
 import { BluetoothService } from '../services/bluetooth.service';
@@ -102,6 +103,17 @@ describe('DistanceViewPage', () => {
   let bt: FakeBluetoothService;
   let alertCtrl: FakeAlertController;
   let router: { navigate: jasmine.Spy };
+
+  // Fix (misma causa que en bluetooth.service.spec.ts): @capacitor/
+  // preferences carga su implementación web con un import() dinámico REAL
+  // la primera vez que se usa, que fakeAsync()/tick() no puede forzar a
+  // resolverse. ionViewWillEnter()/ngOnInit() de esta página llaman a
+  // loadLocalConfig() (Preferences.get()) y varios tests lo hacen dentro de
+  // fakeAsync() — precalentar aquí, fuera de cualquier fakeAsync, evita que
+  // el PRIMERO de esos tests se quede con los spies en 0 llamadas.
+  beforeAll(async () => {
+    await Preferences.get({ key: '__warmup__' });
+  });
 
   beforeEach(() => {
     localStorage.clear();
@@ -411,7 +423,7 @@ describe('DistanceViewPage', () => {
     it('conectado: pide status/relayStats/ping y arranca el sondeo periódico cada 2s', fakeAsync(() => {
       bt.isConnected$.next(true);
       component.ionViewWillEnter();
-      tick(50);
+      tick(500); // margen generoso para Preferences.get() real (import() dinámico de Capacitor, ver nota en bluetooth.service.spec.ts)
 
       expect(bt.requestStatus).toHaveBeenCalledTimes(1);
       expect(bt.requestRelayStats).toHaveBeenCalledTimes(1);
@@ -436,7 +448,7 @@ describe('DistanceViewPage', () => {
     it('ionViewWillLeave() detiene el sondeo periódico', fakeAsync(() => {
       bt.isConnected$.next(true);
       component.ionViewWillEnter();
-      tick(50);
+      tick(500); // margen generoso para Preferences.get() real (import() dinámico de Capacitor, ver nota en bluetooth.service.spec.ts)
       component.ionViewWillLeave();
 
       bt.requestStatus.calls.reset();
@@ -453,7 +465,7 @@ describe('DistanceViewPage', () => {
 
     it('arranca al entrar en lockout/sensor-fault y se repite cada 1200ms', fakeAsync(() => {
       component.ngOnInit();
-      tick(50);
+      tick(500); // margen generoso para Preferences.get() real (import() dinámico de Capacitor, ver nota en bluetooth.service.spec.ts)
 
       bt.highPressureLockout$.next(true);
       tick(0);
@@ -468,7 +480,7 @@ describe('DistanceViewPage', () => {
 
     it('al volver a "ok" detiene la alarma', fakeAsync(() => {
       component.ngOnInit();
-      tick(50);
+      tick(500); // margen generoso para Preferences.get() real (import() dinámico de Capacitor, ver nota en bluetooth.service.spec.ts)
       bt.highPressureLockout$.next(true);
       tick(0);
       bt.highPressureLockout$.next(false);
@@ -483,7 +495,7 @@ describe('DistanceViewPage', () => {
 
     it('toggleMute() silencia una alarma activa sin más pitidos', fakeAsync(() => {
       component.ngOnInit();
-      tick(50);
+      tick(500); // margen generoso para Preferences.get() real (import() dinámico de Capacitor, ver nota en bluetooth.service.spec.ts)
       bt.highPressureLockout$.next(true);
       tick(0);
 
