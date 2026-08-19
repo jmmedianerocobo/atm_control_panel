@@ -376,8 +376,26 @@ export class DistanceViewPage implements OnInit, OnDestroy {
     this.router.navigate(['/auto-config']);
   }
 
-  exitApp(): void {
-    App.exitApp();
+  /**
+   * Fix UX: exitApp() cierra la app entera aunque el equipo pueda seguir
+   * pulverizando, y era la única acción del toolbar sin confirmación pese a
+   * ser la más difícil de deshacer (comparado con recalibrar, borrar
+   * emparejados o resetear contadores, que sí la piden). Mismo patrón de
+   * confirmación que el resto de la app.
+   */
+  async confirmExitApp(): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Salir de la aplicación',
+      message: this.bt.isConnected$.value
+        ? 'El equipo sigue conectado por Bluetooth y puede seguir pulverizando de forma autónoma. Vas a cerrar el panel de control, no el equipo.'
+        : 'Vas a cerrar el panel de control.',
+      backdropDismiss: false,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Salir', role: 'destructive', handler: () => App.exitApp() },
+      ],
+    });
+    await alert.present();
   }
 
   async refreshStatus(): Promise<void> {

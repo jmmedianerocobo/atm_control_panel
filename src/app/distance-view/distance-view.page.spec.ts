@@ -377,6 +377,36 @@ describe('DistanceViewPage', () => {
   });
 
   // ================================================================
+  describe('confirmExitApp()', () => {
+    // No se pulsa el botón "Salir": su handler llama a App.exitApp() de
+    // @capacitor/app, que es un Proxy de registerPlugin() (mismo caso que
+    // Preferences, ver bluetooth.service.spec.ts) — no se puede espiar, y en
+    // web lanza "Not implemented" dentro de una promesa que el propio código
+    // no espera ni captura (fire-and-forget), así que pulsarlo de verdad en
+    // un test dejaría una rejection sin manejar. Se prueba solo el diálogo.
+    it('avisa explícitamente de que el equipo puede seguir pulverizando si sigue conectado', async () => {
+      bt.isConnected$.next(true);
+      await component.confirmExitApp();
+      expect(alertCtrl.dialogs.length).toBe(1);
+      expect(alertCtrl.dialogs[0].opts.message).toContain('sigue conectado');
+      expect(alertCtrl.dialogs[0].opts.message).toContain('puede seguir pulverizando');
+    });
+
+    it('mensaje más simple si no hay conexión activa', async () => {
+      bt.isConnected$.next(false);
+      await component.confirmExitApp();
+      expect(alertCtrl.dialogs[0].opts.message).not.toContain('pulverizando');
+    });
+
+    it('pide confirmación (no cierra directamente) — tiene botón Cancelar además de Salir', async () => {
+      await component.confirmExitApp();
+      const roles = alertCtrl.dialogs[0].opts.buttons.map((b: any) => b.role);
+      expect(roles).toContain('cancel');
+      expect(roles).toContain('destructive');
+    });
+  });
+
+  // ================================================================
   describe('ionViewWillEnter() / ionViewWillLeave()', () => {
     it('conectado: pide status/relayStats/ping y arranca el sondeo periódico cada 2s', fakeAsync(() => {
       bt.isConnected$.next(true);

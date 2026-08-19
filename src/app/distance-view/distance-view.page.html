@@ -24,7 +24,7 @@
       <ion-button fill="clear" (click)="goToBluetoothSettings()">
         <ion-icon name="bluetooth-outline"></ion-icon>
       </ion-button>
-      <ion-button fill="clear" color="danger" (click)="exitApp()">
+      <ion-button fill="clear" color="danger" aria-label="Salir de la aplicación" (click)="confirmExitApp()">
         <ion-icon name="power-outline"></ion-icon>
       </ion-button>
       <ion-chip [color]="(isConnected$ | async) ? 'success' : 'danger'">
@@ -181,9 +181,27 @@
         <article class="panel" *ngIf="highPressureState$ | async as pressureState">
           <header class="panel-hdr orange">
             <div><ion-icon name="speedometer-outline"></ion-icon><span>Alta presión</span></div>
-            <ion-chip [color]="pressureState === 'lockout' || pressureState === 'sensor-fault' ? 'danger' : pressureState === 'ok' ? 'success' : 'medium'">
-              <ion-label>{{ highPressureStateText(pressureState) }}</ion-label>
-            </ion-chip>
+            <div class="panel-hdr-actions">
+              <!-- Fix UX: antes este control SOLO existía dentro del bloque
+                   de alarma activa (*ngIf sobre lockout/sensor-fault) — si
+                   silenciabas y la alarma se resolvía, no había forma de ver
+                   ni de deshacer el silencio hasta la SIGUIENTE alarma real,
+                   que entonces sonaría muda sin ningún aviso previo. Ahora es
+                   un indicador siempre visible (el icono/color delata el
+                   estado con la app en reposo) y siempre pulsable (se puede
+                   desilenciar sin esperar a otra alarma). -->
+              <ion-button
+                fill="clear" size="small"
+                class="mute-indicator"
+                [class.muted]="muted"
+                (click)="toggleMute()"
+                [attr.aria-label]="muted ? 'Alarma silenciada — pulsar para reactivar el sonido' : 'Sonido de alarma activado — pulsar para silenciar'">
+                <ion-icon [name]="muted ? 'volume-mute-outline' : 'volume-high-outline'"></ion-icon>
+              </ion-button>
+              <ion-chip [color]="pressureState === 'lockout' || pressureState === 'sensor-fault' ? 'danger' : pressureState === 'ok' ? 'success' : 'medium'">
+                <ion-label>{{ highPressureStateText(pressureState) }}</ion-label>
+              </ion-chip>
+            </div>
           </header>
 
           <div class="panel-body pressure-body">

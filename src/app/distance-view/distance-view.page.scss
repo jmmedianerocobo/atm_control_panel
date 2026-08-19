@@ -148,6 +148,16 @@ ion-toolbar {
   font-size: clamp(15px, 2.6vh, 19px);
 }
 
+/* Indicador persistente de silencio (ver nota en el .html): color neutro
+   con sonido activado, naranja de aviso en cuanto está silenciada — visible
+   con la app en reposo, no solo durante una alarma sonando. */
+.mute-indicator {
+  --color: rgba(255, 255, 255, 0.55);
+}
+.mute-indicator.muted {
+  --color: var(--orange);
+}
+
 .panel-hdr ion-chip {
   height: clamp(24px, 4.2vh, 33px);
   margin: 0;
