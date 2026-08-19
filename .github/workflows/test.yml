@@ -1,0 +1,42 @@
+name: Tests
+
+# CI mínimo: que ningún push/PR pueda romper `ng test` (138 tests entre
+# servicios y páginas, ver services/*.spec.ts y */*.page.spec.ts) sin que
+# nadie se entere hasta acordarse de correrlos a mano. Se ejecuta en
+# cualquier rama (el trabajo activo vive en fix/bt-reliability-priority-queue,
+# no en main) y en pull requests contra main.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar tipos (app)
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Comprobar tipos (tests)
+        run: npx tsc --noEmit -p tsconfig.spec.json
+
+      - name: Tests unitarios (Karma + ChromeHeadless)
+        run: npx ng test --watch=false --browsers=ChromeHeadless
+        env:
+          # Los runners ubuntu-latest de GitHub traen Chrome preinstalado en
+          # esta ruta (ver https://github.com/actions/runner-images) — mismo
+          # patrón que CHROME_BIN en local, solo que aquí ya no hay que
+          # exportarlo a mano cada vez.
+          CHROME_BIN: /usr/bin/google-chrome-stable
