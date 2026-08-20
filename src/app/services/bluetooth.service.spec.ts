@@ -442,6 +442,52 @@ describe('BluetoothService (fachada de dominio)', () => {
       expect(transport.disconnect).toHaveBeenCalledTimes(1);
       expect(transport.connect).toHaveBeenCalledTimes(1);
     }));
+
+    // Regresión: antes, un único fallo de transport.connect() dentro de
+    // reconnect() dejaba el heartbeat parado para siempre (solo se reinicia
+    // en un connect() con éxito), así que reconnectRequested$ no volvía a
+    // emitir jamás y MAX_RECONNECT_ATTEMPTS nunca se agotaba de verdad — un
+    // único intento fallido bastaba para dejar la app desconectada sin
+    // recuperación automática posible. Ahora reconnect() agota los
+    // MAX_RECONNECT_ATTEMPTS reintentos dentro de la misma invocación.
+    it('si connect() falla repetidamente, reintenta hasta MAX_RECONNECT_ATTEMPTS veces en la misma reconexión', fakeAsync(() => {
+      transport.connectedDevice$.next(TEST_DEVICE);
+      transport.isConnected$.next(true);
+      transport.connect.and.rejectWith(new Error('fallo simulado'));
+
+      transport.reconnectRequested$.next();
+      tick(5000); // margen amplio para 3 intentos × 800ms de espera interna
+
+      expect(transport.disconnect).toHaveBeenCalledTimes(3);
+      expect(transport.connect).toHaveBeenCalledTimes(3);
+    }));
+
+    it('tras agotar los reintentos automáticos, un connect() manual posterior con éxito reactiva la reconexión automática futura', fakeAsync(() => {
+      transport.connectedDevice$.next(TEST_DEVICE);
+      transport.isConnected$.next(true);
+      transport.connect.and.rejectWith(new Error('fallo simulado'));
+
+      transport.reconnectRequested$.next();
+      tick(5000); // agota los 3 intentos automáticos
+      expect(transport.connect).toHaveBeenCalledTimes(3);
+
+      // El usuario reconecta a mano desde bt-settings, con éxito.
+      transport.connect.and.callFake(async (dev: BluetoothDevice | string) => {
+        const device = typeof dev === 'string' ? { name: dev, address: dev } : dev;
+        transport.connectedDevice$.next(device);
+        transport.isConnected$.next(true);
+      });
+      service.connect(TEST_DEVICE);
+      tick(3000);
+      expect(transport.connect).toHaveBeenCalledTimes(4);
+
+      // Si reconnectAttempts no se hubiera reseteado en el connect() manual,
+      // esta nueva señal se ignoraría (guard de MAX_RECONNECT_ATTEMPTS ya
+      // agotado) y transport.connect no se volvería a llamar.
+      transport.reconnectRequested$.next();
+      tick(3000);
+      expect(transport.connect).toHaveBeenCalledTimes(5);
+    }));
   });
 
   // ================================================================

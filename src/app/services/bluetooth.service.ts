@@ -524,6 +524,12 @@ export class BluetoothService {
 
     await this.saveConfigToPreferences().catch(e => this.log('warn', 'CONNECT', 'saveConfig falló', e));
     this.transport.adaptToProtocolVersion();
+    // Fix: cualquier connect() exitoso —manual desde bt-settings o dentro de
+    // reconnect()— limpia el contador de intentos. Si no se resetea aquí,
+    // un reconnect() automático que agotó MAX_RECONNECT_ATTEMPTS deja el
+    // guard de reconnect() bloqueado para siempre incluso después de que el
+    // usuario reconecte manualmente con éxito.
+    this.reconnectAttempts = 0;
     this.log('info', 'CONNECT', 'Conexión completada', { enableL: this.enabledLeft$.value, enableR: this.enabledRight$.value });
   }
 
@@ -551,16 +557,33 @@ export class BluetoothService {
     if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) return;
 
     this.reconnecting = true;
-    this.reconnectAttempts++;
 
     try {
-      // No hace falta esperar aquí a que la cola de comandos se vacíe: en
-      // cuanto disconnect() pone isConnected$ a false, cualquier comando en
-      // curso o en cola falla de inmediato (ver BleTransportService), así
-      // que el worker se libera solo casi al instante.
-      try { await this.disconnect(); } catch {}
-      await new Promise(r => setTimeout(r, 800));
-      try { await this.connect(dev); this.reconnectAttempts = 0; } catch {}
+      // Fix: reconnect() SOLO se dispara desde transport.reconnectRequested$,
+      // que a su vez solo lo emite el heartbeat — y el heartbeat se para en
+      // disconnect() y no vuelve a arrancar hasta un connect() con éxito
+      // (adaptToProtocolVersion() en connect()). Antes, un único intento
+      // fallido aquí dejaba el heartbeat muerto para siempre: no había forma
+      // de que un segundo o tercer intento ocurriera pese a lo que sugiere
+      // MAX_RECONNECT_ATTEMPTS. Por eso los reintentos se agotan en un único
+      // bucle dentro de esta misma llamada, sin depender de un heartbeat que
+      // ya no está corriendo.
+      while (this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
+        this.reconnectAttempts++;
+        // No hace falta esperar aquí a que la cola de comandos se vacíe: en
+        // cuanto disconnect() pone isConnected$ a false, cualquier comando
+        // en curso o en cola falla de inmediato (ver BleTransportService),
+        // así que el worker se libera solo casi al instante.
+        try { await this.disconnect(); } catch {}
+        await new Promise(r => setTimeout(r, 800));
+        try {
+          await this.connect(dev); // resetea reconnectAttempts a 0 al éxito
+          return;
+        } catch (e) {
+          this.log('warn', 'RECONNECT', `Intento ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS} fallido`, e);
+        }
+      }
+      this.log('warn', 'RECONNECT', `Reconexión automática abandonada tras ${this.MAX_RECONNECT_ATTEMPTS} intentos — requiere reconexión manual`);
     } finally {
       this.reconnecting = false;
     }
