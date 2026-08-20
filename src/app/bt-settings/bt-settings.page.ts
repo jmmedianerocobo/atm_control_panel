@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BluetoothService, BluetoothDevice } from '../services/bluetooth.service';
+import { ToastService } from '../services/toast.service';
 
 import {
   IonHeader, IonToolbar, IonTitle,
@@ -41,29 +42,8 @@ export class BtSettingsPage implements OnInit {
   constructor(
     public bt: BluetoothService,
     private alertController: AlertController,
+    private toast: ToastService,
   ) {}
-
-  // Fix: en este tablet concreto (WebView del sistema), CUALQUIER forma de
-  // <ion-toast> resultó invisible en la práctica, aunque se activaba de
-  // verdad por debajo (confirmado con Chrome DevTools Protocol,
-  // inspeccionando el shadow DOM en directo) — declarativo, ToastController
-  // imperativo, y hasta creando el elemento a mano con
-  // document.createElement() e insertándolo directamente en <ion-app>: en
-  // los tres casos, disparado desde un toque real, el "toast-wrapper" nunca
-  // llegaba a renderizarse (a veces ni siquiera existía en el shadow DOM).
-  // AlertController SÍ se ve bien en este mismo dispositivo con toda
-  // certeza (confirmUnpairAll() de más abajo, verificado visualmente varias
-  // veces) — se reutiliza como sustituto de "toast", con auto-cierre para
-  // no exigir que el usuario lo cierre a mano.
-  private async presentToast(message: string, color: 'success' | 'danger'): Promise<void> {
-    const alert = await this.alertController.create({
-      message,
-      cssClass: color === 'success' ? 'toast-alert toast-alert-success' : 'toast-alert toast-alert-danger',
-      backdropDismiss: true,
-    });
-    await alert.present();
-    setTimeout(() => alert.dismiss().catch(() => {}), color === 'success' ? 2200 : 3200);
-  }
 
   ngOnInit() {
     this.bt.loadPairedDevices().catch(err =>
@@ -176,15 +156,15 @@ export class BtSettingsPage implements OnInit {
     try {
       const { removed, failed } = await this.bt.unpairAllPaired();
       if (failed.length === 0) {
-        await this.presentToast(`${removed} dispositivo(s) eliminado(s) correctamente`, 'success');
+        await this.toast.present(`${removed} dispositivo(s) eliminado(s) correctamente`, 'success');
       } else {
-        await this.presentToast(
+        await this.toast.present(
           `${removed} eliminado(s), ${failed.length} fallaron (${failed.map(f => f.device.name).join(', ')})`,
           'danger',
         );
       }
     } catch (err) {
-      await this.presentToast(err instanceof Error ? err.message : String(err), 'danger');
+      await this.toast.present(err instanceof Error ? err.message : String(err), 'danger');
     } finally {
       this.isUnpairingAll = false;
     }
@@ -214,11 +194,11 @@ export class BtSettingsPage implements OnInit {
     const text = this.buildDiagnosticsText();
 
     if (await this.tryClipboardApi(text)) {
-      await this.presentToast('Diagnóstico copiado al portapapeles', 'success');
+      await this.toast.present('Diagnóstico copiado al portapapeles', 'success');
       return;
     }
     if (this.tryLegacyCopy(text)) {
-      await this.presentToast('Diagnóstico copiado al portapapeles', 'success');
+      await this.toast.present('Diagnóstico copiado al portapapeles', 'success');
       return;
     }
     await this.showDiagnosticsForManualCopy(text);

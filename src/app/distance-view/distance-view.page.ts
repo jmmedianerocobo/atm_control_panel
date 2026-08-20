@@ -21,24 +21,6 @@ import {
   AlertController,
 } from '@ionic/angular/standalone';
 
-import { addIcons } from 'ionicons';
-import {
-  settingsOutline,
-  bluetoothOutline,
-  powerOutline,
-  waterOutline,
-  speedometerOutline,
-  syncOutline,
-  refreshOutline,
-  volumeHighOutline,
-  volumeMuteOutline,
-  warningOutline,
-  checkmarkCircleOutline,
-  lockClosedOutline,
-  analyticsOutline,
-  trashOutline,
-} from 'ionicons/icons';
-
 import { BluetoothService } from '../services/bluetooth.service';
 
 const PREF_DEPOSITO_CAP = 'cfg.depositoCap';
@@ -202,24 +184,7 @@ export class DistanceViewPage implements OnInit, OnDestroy {
     private router: Router,
     public bt: BluetoothService,
     private alertController: AlertController,
-  ) {
-    addIcons({
-      'settings-outline': settingsOutline,
-      'bluetooth-outline': bluetoothOutline,
-      'power-outline': powerOutline,
-      'water-outline': waterOutline,
-      'speedometer-outline': speedometerOutline,
-      'sync-outline': syncOutline,
-      'refresh-outline': refreshOutline,
-      'volume-high-outline': volumeHighOutline,
-      'volume-mute-outline': volumeMuteOutline,
-      'warning-outline': warningOutline,
-      'checkmark-circle-outline': checkmarkCircleOutline,
-      'lock-closed-outline': lockClosedOutline,
-      'analytics-outline': analyticsOutline,
-      'trash-outline': trashOutline,
-    });
-  }
+  ) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadLocalConfig();

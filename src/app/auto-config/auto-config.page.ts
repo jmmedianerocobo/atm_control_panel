@@ -10,28 +10,8 @@ import {
   AlertController,
 } from '@ionic/angular/standalone';
 
-import { addIcons } from 'ionicons';
-import {
-  bluetoothOutline,
-  closeCircleOutline,
-  radioOutline,
-  timerOutline,
-  pulseOutline,
-  chevronDownOutline,
-  chevronUpOutline,
-  warningOutline,
-  stopCircleOutline,
-  arrowBackOutline,
-  arrowForwardOutline,
-  cubeOutline,
-  locateOutline,
-  speedometerOutline,
-  syncOutline,
-  checkmarkCircleOutline,
-  saveOutline,
-} from 'ionicons/icons';
-
 import { BluetoothService, HP_MIN_GAP_BAR } from '../services/bluetooth.service';
+import { ToastService } from '../services/toast.service';
 import { Preferences } from '@capacitor/preferences';
 
 const PREF_DEPOSITO_CAP = 'cfg.depositoCap';
@@ -145,48 +125,8 @@ export class AutoConfigPage {
   constructor(
     public bt: BluetoothService,
     private alertController: AlertController,
-  ) {
-    addIcons({
-      'bluetooth-outline': bluetoothOutline,
-      'close-circle-outline': closeCircleOutline,
-      'radio-outline': radioOutline,
-      'timer-outline': timerOutline,
-      'pulse-outline': pulseOutline,
-      'chevron-down-outline': chevronDownOutline,
-      'chevron-up-outline': chevronUpOutline,
-      'warning-outline': warningOutline,
-      'stop-circle-outline': stopCircleOutline,
-      'arrow-back-outline': arrowBackOutline,
-      'arrow-forward-outline': arrowForwardOutline,
-      'cube-outline': cubeOutline,
-      'locate-outline': locateOutline,
-      'speedometer-outline': speedometerOutline,
-      'sync-outline': syncOutline,
-      'checkmark-circle-outline': checkmarkCircleOutline,
-      'save-outline': saveOutline,
-    });
-  }
-
-  // Fix: en este tablet concreto (WebView del sistema), CUALQUIER forma de
-  // <ion-toast> resultó invisible en la práctica, aunque se activaba de
-  // verdad por debajo (confirmado con Chrome DevTools Protocol,
-  // inspeccionando el shadow DOM en directo, depurando primero este mismo
-  // bug en bt-settings.page.ts) — declarativo, ToastController imperativo,
-  // y hasta creando el elemento a mano con document.createElement() e
-  // insertándolo directamente en <ion-app>: en los tres casos, disparado
-  // desde un toque real, el "toast-wrapper" nunca llegaba a renderizarse.
-  // AlertController SÍ se ve bien en este mismo dispositivo con toda
-  // certeza (usado en toda esta página) — se reutiliza como sustituto de
-  // "toast", con auto-cierre para no exigir que el usuario lo cierre a mano.
-  private async presentToast(message: string, color: 'success' | 'danger'): Promise<void> {
-    const alert = await this.alertController.create({
-      message,
-      cssClass: color === 'success' ? 'toast-alert toast-alert-success' : 'toast-alert toast-alert-danger',
-      backdropDismiss: true,
-    });
-    await alert.present();
-    setTimeout(() => alert.dismiss().catch(() => {}), color === 'success' ? 2200 : 3200);
-  }
+    private toast: ToastService,
+  ) {}
 
   async ionViewWillEnter() {
     this.sourceMode        = this.bt.sourceMode$.value;
@@ -486,10 +426,10 @@ export class AutoConfigPage {
 
       await this.saveLocalParams();
 
-      await this.presentToast('Configuración aplicada correctamente', 'success');
+      await this.toast.present('Configuración aplicada correctamente', 'success');
 
     } catch (err) {
-      await this.presentToast(err instanceof Error ? err.message : String(err), 'danger');
+      await this.toast.present(err instanceof Error ? err.message : String(err), 'danger');
     } finally {
       this.saving = false;
     }
@@ -503,7 +443,7 @@ export class AutoConfigPage {
    */
   async confirmLevelCalibration(): Promise<void> {
     if (!this.bt.isConnected$.value) {
-      await this.presentToast('Conecta primero el dispositivo Bluetooth', 'danger');
+      await this.toast.present('Conecta primero el dispositivo Bluetooth', 'danger');
       return;
     }
 
@@ -529,9 +469,9 @@ export class AutoConfigPage {
 
     try {
       await this.bt.calibrateLevel();
-      await this.presentToast('Nivel vacío calibrado correctamente (cero de presión + plano MPU6050)', 'success');
+      await this.toast.present('Nivel vacío calibrado correctamente (cero de presión + plano MPU6050)', 'success');
     } catch (err) {
-      await this.presentToast(err instanceof Error ? err.message : String(err), 'danger');
+      await this.toast.present(err instanceof Error ? err.message : String(err), 'danger');
     } finally {
       this.calibrating = false;
     }
@@ -544,12 +484,12 @@ export class AutoConfigPage {
    */
   async confirmFullLevelCalibration(): Promise<void> {
     if (!this.bt.isConnected$.value) {
-      await this.presentToast('Conecta primero el dispositivo Bluetooth', 'danger');
+      await this.toast.present('Conecta primero el dispositivo Bluetooth', 'danger');
       return;
     }
 
     if (!this.bt.levelCalibrated$.value) {
-      await this.presentToast('Calibra primero el nivel vacío', 'danger');
+      await this.toast.present('Calibra primero el nivel vacío', 'danger');
       return;
     }
 
@@ -575,9 +515,9 @@ export class AutoConfigPage {
 
     try {
       await this.bt.calibrateLevelFull();
-      await this.presentToast('Nivel lleno calibrado correctamente', 'success');
+      await this.toast.present('Nivel lleno calibrado correctamente', 'success');
     } catch (err) {
-      await this.presentToast(err instanceof Error ? err.message : String(err), 'danger');
+      await this.toast.present(err instanceof Error ? err.message : String(err), 'danger');
     } finally {
       this.calibratingFull = false;
     }
@@ -594,11 +534,11 @@ export class AutoConfigPage {
    */
   async confirmTiltReferenceCalibration(): Promise<void> {
     if (!this.bt.isConnected$.value) {
-      await this.presentToast('Conecta primero el dispositivo Bluetooth', 'danger');
+      await this.toast.present('Conecta primero el dispositivo Bluetooth', 'danger');
       return;
     }
     if (!this.bt.levelCalibrated$.value) {
-      await this.presentToast('Calibra primero el nivel vacío', 'danger');
+      await this.toast.present('Calibra primero el nivel vacío', 'danger');
       return;
     }
 
@@ -623,9 +563,9 @@ export class AutoConfigPage {
 
     try {
       await this.bt.calibrateTiltReference();
-      await this.presentToast('Referencia capturada — ahora inclina el equipo y pulsa "Calcular distancia"', 'success');
+      await this.toast.present('Referencia capturada — ahora inclina el equipo y pulsa "Calcular distancia"', 'success');
     } catch (err) {
-      await this.presentToast(err instanceof Error ? err.message : String(err), 'danger');
+      await this.toast.present(err instanceof Error ? err.message : String(err), 'danger');
     } finally {
       this.calibratingTiltRef = false;
     }
@@ -640,11 +580,11 @@ export class AutoConfigPage {
    */
   async confirmTiltApplyCalibration(): Promise<void> {
     if (!this.bt.isConnected$.value) {
-      await this.presentToast('Conecta primero el dispositivo Bluetooth', 'danger');
+      await this.toast.present('Conecta primero el dispositivo Bluetooth', 'danger');
       return;
     }
     if (!this.bt.tiltCalRefCaptured$.value) {
-      await this.presentToast('Captura primero la referencia (paso 1)', 'danger');
+      await this.toast.present('Captura primero la referencia (paso 1)', 'danger');
       return;
     }
 
@@ -669,10 +609,10 @@ export class AutoConfigPage {
 
     try {
       await this.bt.calibrateTiltApply();
-      await this.presentToast(`Distancia calculada y guardada: ${this.bt.sensorLongitudinalOffsetMm$.value} mm`, 'success');
+      await this.toast.present(`Distancia calculada y guardada: ${this.bt.sensorLongitudinalOffsetMm$.value} mm`, 'success');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await this.presentToast(
+      await this.toast.present(
         msg.includes('BAD_VALUE')
           ? 'Inclinación insuficiente respecto al paso 1 — inclina más y vuelve a pulsar "Calcular distancia"'
           : msg,
@@ -706,7 +646,7 @@ export class AutoConfigPage {
    */
   async confirmHpZeroCalibration(): Promise<void> {
     if (!this.bt.isConnected$.value) {
-      await this.presentToast('Conecta primero el dispositivo Bluetooth', 'danger');
+      await this.toast.present('Conecta primero el dispositivo Bluetooth', 'danger');
       return;
     }
 
@@ -727,9 +667,9 @@ export class AutoConfigPage {
     this.calibratingHpZero = true;
     try {
       await this.bt.calibrateHighPressureZero();
-      await this.presentToast('Cero de alta presión calibrado correctamente', 'success');
+      await this.toast.present('Cero de alta presión calibrado correctamente', 'success');
     } catch (err) {
-      await this.presentToast(err instanceof Error ? err.message : String(err), 'danger');
+      await this.toast.present(err instanceof Error ? err.message : String(err), 'danger');
     } finally {
       this.calibratingHpZero = false;
     }
@@ -745,24 +685,24 @@ export class AutoConfigPage {
   async startLeft() {
     try {
       if (this.bt.mode$.value !== 1) {
-        await this.presentToast('Solo disponible en modo temporizado', 'danger');
+        await this.toast.present('Solo disponible en modo temporizado', 'danger');
         return;
       }
       await this.bt.testTrigger('L');
     } catch (e) {
-      await this.presentToast(e instanceof Error ? e.message : String(e), 'danger');
+      await this.toast.present(e instanceof Error ? e.message : String(e), 'danger');
     }
   }
 
   async startRight() {
     try {
       if (this.bt.mode$.value !== 1) {
-        await this.presentToast('Solo disponible en modo temporizado', 'danger');
+        await this.toast.present('Solo disponible en modo temporizado', 'danger');
         return;
       }
       await this.bt.testTrigger('R');
     } catch (e) {
-      await this.presentToast(e instanceof Error ? e.message : String(e), 'danger');
+      await this.toast.present(e instanceof Error ? e.message : String(e), 'danger');
     }
   }
 
@@ -770,7 +710,7 @@ export class AutoConfigPage {
     try {
       await this.bt.emergencyStop();
     } catch (e) {
-      await this.presentToast(e instanceof Error ? e.message : String(e), 'danger');
+      await this.toast.present(e instanceof Error ? e.message : String(e), 'danger');
     }
   }
 }
